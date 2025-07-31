@@ -68,7 +68,7 @@ _The specific file names might change, so check the output of `uci` for the corr
 - repo: https://github.com/official-stockfish/Stockfish
 - commit: [03e2748](https://github.com/official-stockfish/Stockfish/commit/03e27488f3d21d8ff4dbf3065603afa21dbd0ef3)
 - tag: sf_17.1
-- big nnue: [nn-1111cefa1111.nnue](https://tests.stockfishchess.org/api/nn/nn-1c0000000000.nnue)
+- big nnue: [nn-1c0000000000.nnue](https://tests.stockfishchess.org/api/nn/nn-1c0000000000.nnue)
 - small nnue: [nn-37f18f62d772.nnue](//tests.stockfishchess.org/api/nn/nn-37f18f62d772.nnue)
 
 ### fsf14 (Fairy-Stockfish 14)
