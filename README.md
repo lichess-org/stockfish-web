@@ -63,6 +63,13 @@ _The specific file names might change, so check the output of `uci` for the corr
 - tag: sf_16
 - nnue: [nn-5af11540bbfe.nnue](https://tests.stockfishchess.org/nns?network_name=nn-5af11540bbfe)
 
+### sf171-7 (Stockfish 17.1 linrock 256)
+
+- repo: https://github.com/official-stockfish/Stockfish
+- commit: [03e2748](https://github.com/official-stockfish/Stockfish/commit/03e27488f3d21d8ff4dbf3065603afa21dbd0ef3)
+- tag: sf_17.1
+- nnue: [nn-ecb35f70ff2a.nnue](https://tests.stockfishchess.org/api/nn/nn-ecb35f70ff2a.nnue)
+
 ### sf171-79 (Official Stockfish 17.1 release)
 
 - repo: https://github.com/official-stockfish/Stockfish
