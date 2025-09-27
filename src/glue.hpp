@@ -2,7 +2,12 @@
 
 #include <emscripten.h>
 #include <emscripten/bind.h>
+#include <condition_variable>
 #include <queue>
+#include <memory>
+#include <mutex>
+#include <streambuf>
+#include <string>
 
 struct Command : public std::streambuf {
   enum { UCI, NNUE } type;

@@ -22,6 +22,7 @@ PATCH = 7
 targets = {
     "fsf14": {"url": fairy_stockfish_repo, "commit": "a621470", "cxx_flags": ""},
     "sf16-7": {"url": stockfish_repo, "commit": "68e1e9b", "cxx_flags": ""},
+    "sf171-7": {"url": stockfish_repo, "commit": "03e2748", "cxx_flags": ""},
     "sf171-79": {"url": stockfish_repo, "commit": "03e2748", "cxx_flags": ""}, # 17.1
 }
 
