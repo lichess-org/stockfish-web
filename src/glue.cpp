@@ -1,11 +1,13 @@
 #include "glue.hpp"
 
+#include <string>
+
 #include "evaluate.h"
 #include "syzygy/tbprobe.h"
 #include "uci.h"
 #include "nnue/nnue_architecture.h"
 
-#if __has_include("nnue/evaluate_nnue.h") // single nnue
+#if __has_include("nnue/evaluate_nnue.h") // sf-16
 # include "nnue/evaluate_nnue.h"
 # define EvalFileDefaultNameSmall EvalFileDefaultName
 # define EvalFileDefaultNameBig EvalFileDefaultName
@@ -16,7 +18,10 @@
     else std::cerr << "BAD_NNUE" << std::endl;
     return "setoption name Use NNUE value false";
   }
-#else // big/little nnue
+#else // sf-17
+  # ifndef EvalFileDefaultNameSmall // single net
+  # define EvalFileDefaultNameSmall EvalFileDefaultNameBig
+  # endif
   extern Stockfish::UCIEngine* uci_global;
 
   const std::string load_nnue_cmd(Command& cmd) {
