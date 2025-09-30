@@ -8,8 +8,6 @@
   "type": "module",
   "types": "stockfishWeb.d.ts",
   "files": [
-    "sf16-7.js",
-    "sf16-7.wasm",
     "sf171-7.js",
     "sf171-7.wasm",
     "sf171-79.js",

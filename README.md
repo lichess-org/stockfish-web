@@ -26,10 +26,10 @@ to avoid installing or changing your emscripten version, use `./build-with-docke
 Edit the Stockfish sources within `./fishes`. Contribute your edits via patch file
 
 ```
-# Example: Update `sf16-7.patch` with your source changes:
+# Example: Update `sf171-7.patch` with your source changes:
 
-  cd fishes/sf16-7
-  git diff > ../../patches/sf16-7.patch
+  cd fishes/sf171-7
+  git diff > ../../patches/sf171-7.patch
 ```
 
 ## Run locally on node
@@ -49,19 +49,6 @@ small nn-37f18f62d772.nnue
 _The specific file names might change, so check the output of `uci` for the correct names._
 
 ## Sources
-
-### sf16-7 (Stockfish 16 linrock 256)
-
-- repo: https://github.com/linrock/Stockfish
-- commit: [c97f5cb](https://github.com/linrock/Stockfish/commit/c97f5cb)
-- nnue: [nn-ecb35f70ff2a.nnue](https://tests.stockfishchess.org/nns?network_name=nn-ecb35f70ff2a)
-
-### sf16-40 (Official Stockfish 16 release)
-
-- repo: https://github.com/official-stockfish/Stockfish
-- commit: [68e1e9b](https://github.com/official-stockfish/Stockfish/commit/68e1e9b)
-- tag: sf_16
-- nnue: [nn-5af11540bbfe.nnue](https://tests.stockfishchess.org/nns?network_name=nn-5af11540bbfe)
 
 ### sf171-7 (Stockfish 17.1 linrock 256)
 
