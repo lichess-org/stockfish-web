@@ -37,7 +37,7 @@ jobs:
       - run: emcc --version
 
       - name: Build stockfishes
-        run: ./build.py all
+        run: ./build.py dist
 
       - uses: actions/setup-node@v4
         with:
