@@ -8,10 +8,10 @@
   "type": "module",
   "types": "stockfishWeb.d.ts",
   "files": [
-    "sf171-7.js",
-    "sf171-7.wasm",
-    "sf171-79.js",
-    "sf171-79.wasm",
+    "sf17_1-7.js",
+    "sf17_1-7.wasm",
+    "sf17_1-79.js",
+    "sf17_1-79.wasm",
     "fsf14.js",
     "fsf14.wasm",
     "stockfishWeb.d.ts"
