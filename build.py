@@ -5,10 +5,6 @@ import glob
 import os
 import os.path
 import re
-try:
-    import requests
-except ImportError:
-    requests = None
 
 stockfish_repo = "https://github.com/official-stockfish/Stockfish"
 fairy_stockfish_repo = "https://github.com/fairy-stockfish/Fairy-Stockfish"
@@ -17,13 +13,43 @@ fairy_stockfish_repo = "https://github.com/fairy-stockfish/Fairy-Stockfish"
 
 MAJOR = 4
 MINOR = 0
-PATCH = 7
+PATCH = 18
+
+build_tags = ["all", "legacy", "dist"]
 
 targets = {
-    "fsf14": {"url": fairy_stockfish_repo, "commit": "a621470", "cxx_flags": ""},
-    "sf171-7": {"url": stockfish_repo, "commit": "03e2748", "cxx_flags": ""}, # 17.1 linrock 256
-    "sf171-79": {"url": stockfish_repo, "commit": "03e2748", "cxx_flags": ""}, # 17.1
+    "sf16-7": {"url": stockfish_repo, "commit": "68e1e9b", "tags": ["all", "legacy"]},
+    "sf16-40": {"url": stockfish_repo, "commit": "68e1e9b", "tags": ["all", "legacy"]},
+    "fsf14": {
+        "url": fairy_stockfish_repo,
+        "commit": "a621470",
+        "tags": ["all", "dist"],
+    },
+    "sf17-79": {
+        "url": stockfish_repo,
+        "commit": "e0bfc4b",
+        "tags": ["all", "legacy"],
+    },  # 17
+    "sf17_1-7": {
+        "url": stockfish_repo,
+        "commit": "03e2748",
+        "tags": ["all", "dist"],
+    },  # 17.1
+    "sf17_1-79": {
+        "url": stockfish_repo,
+        "commit": "03e2748",
+        "tags": ["all", "dist"],
+    },  # 17.1
 }
+
+default_target = "sf17_1-79"
+
+default_cxx_flags = ["-O3", "-DNDEBUG", "--closure=1"]
+
+default_ld_flags = [
+    "-sENVIRONMENT=web,worker",
+    "-sPTHREAD_POOL_SIZE=navigator.hardwareConcurrency",
+]
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
 fishes_dir = os.path.join(script_dir, "fishes")
@@ -36,19 +62,21 @@ ignore_sources = [
 ]
 
 
-def makefile(target, sources, flags, link_flags):
-    flags = " ".join([flags.strip(), targets[target].get("cxx_flags", "").strip()])
-# DO NOT replace tabs with spaces
-# fmt: off
+def makefile(target, sources, cxx_flags, ld_flags):
+    all_cxx_flags = " ".join(
+        [cxx_flags.strip(), targets[target].get("cxx", "").strip()]
+    )
+    # DO NOT replace tabs with spaces
+    # fmt: off
     return f"""
 
 CXX = em++
 EXE = {target}
 
-CXX_FLAGS = {flags} -Isrc -pthread -msimd128 -mavx -flto -fno-exceptions \\
+CXX_FLAGS = {all_cxx_flags} -Isrc -pthread -msimd128 -mavx -flto -fno-exceptions \\
 	-DUSE_POPCNT -DUSE_SSE2 -DUSE_SSSE3 -DUSE_SSE41 -DNO_PREFETCH -DNNUE_EMBEDDING_OFF
 
-LD_FLAGS = {link_flags} \\
+LD_FLAGS = {ld_flags} \\
 	--pre-js=../../src/initModule.js -sEXIT_RUNTIME -sEXPORT_ES6 -sEXPORT_NAME={mod_name(target)} \\
 	-sEXPORTED_FUNCTIONS='[_malloc,_main]' -sEXPORTED_RUNTIME_METHODS='[stringToUTF8,UTF8ToString,HEAPU8]' \\
 	-sINCOMING_MODULE_JS_API='[locateFile,print,printErr,wasmMemory,buffer,instantiateWasm,mainScriptUrlOrBlob]' \\
@@ -72,19 +100,31 @@ src/glue.o: ../../src/glue.cpp
 
 # fmt: on
 
+
 def mod_name(target):
-    return f"{''.join(seg.capitalize() for seg in target.split('-'))}Web"
+    return "_".join(seg.capitalize() for seg in re.split(r"[_-]", target)) + "Web"
+
 
 def main():
     parser = argparse.ArgumentParser(description="build stockfish wasms")
-    parser.add_argument("--flags", help="em++ cxxflags", default="-O3 -DNDEBUG --closure=1")
-    parser.add_argument("--node", action="store_true", help="target node.js")
-    parser.add_argument("--nnue", action="store_true", help="download recommended nnues")
-    parser.add_argument("--emcc-version", action="store_true", help="print required emscripten version")
+    parser.add_argument(
+        "--cxx",
+        help="em++ cxxflags. for debug use --cxx='-O0 -g3 -sSAFE_HEAP'. (default: '%(default)s')",
+        default=" ".join(default_cxx_flags),
+    )
+    parser.add_argument(
+        "--ld",
+        help="em++ linker flags. for node use --ld='-sENVIRONMENT=node'. (default: '%(default)s')",
+        default=" ".join(default_ld_flags),
+    )
+    parser.add_argument(
+        "--emcc-version", action="store_true", help="print required emscripten version and exit"
+    )
     parser.add_argument(
         "target",
         nargs="*",
-        help=f"{', '.join(list(targets.keys()))}, clean, or all (default: 'sf171-79')",
+        help=f"clean, {', '.join(build_tags + list(targets.keys()))}. (default: '%(default)s')",
+        default=[default_target],
     )
 
     args = parser.parse_args()
@@ -94,46 +134,49 @@ def main():
 
     arg_targets = list(args.target)
     if len(arg_targets) == 0:
-        arg_targets = ["sf171-79"]
+        arg_targets = ["default"]
 
     if "clean" in arg_targets:
         clean()
         arg_targets.remove("clean")
 
-    if "all" in arg_targets:
-        arg_targets = list(targets.keys())
+    arg_targets = [
+        name
+        for tok in arg_targets
+        for name in (
+            [key for key, info in targets.items() if tok in info["tags"]]
+            if tok in build_tags
+            else [tok]
+        )
+    ]
 
     if len(arg_targets) > 0:
         assert_emsdk()
-        print(f"building: {', '.join(arg_targets)}{' for node.js' if args.node else ''}")
-        print(f"flags: {args.flags}")
+        print(f"building: {', '.join(arg_targets)}")
+        print(f"cxxflags: {args.cxx}")
+        print(f"ldflags: {args.ld}")
         print("")
     try:
         for target in arg_targets:
-            build_target(target, args.flags, args.node)
-            if args.nnue:
-                fetch_network(target)
+            build_target(target, args.cxx, args.ld)
     except Exception as e:
         print(e)
 
 
-def build_target(target, flags, node):  # changes cwd
+def build_target(target, cxx_flags, ld_flags):  # changes cwd
     target_dir = os.path.join(fishes_dir, target)
     fetch_sources(target)
 
     os.chdir(os.path.join(target_dir, "src"))
 
-    sources = [f for f in glob.glob("**/*.cpp", recursive=True) if f not in ignore_sources]
+    sources = [
+        f for f in glob.glob("**/*.cpp", recursive=True) if f not in ignore_sources
+    ]
 
     os.chdir(target_dir)
 
-    if not node:
-        more_flags = "-sENVIRONMENT=web,worker -sPTHREAD_POOL_SIZE=navigator.hardwareConcurrency"
-    else:
-        more_flags = "-sENVIRONMENT=node"
-
     with open("Makefile.tmp", "w") as f:
-        f.write(makefile(target, " ".join(sources), flags, more_flags))
+        f.write(makefile(target, " ".join(sources), cxx_flags, ld_flags))
 
     subprocess.run(["make", "-f", "Makefile.tmp", "-j"], check=True)
 
@@ -148,45 +191,30 @@ def fetch_sources(target):
     if not os.path.exists(target_dir):
         os.makedirs(target_dir)
         os.chdir(fishes_dir)
-        subprocess.run(["git", "clone", targets[target]["url"], target], check=True)
-        subprocess.run(["git", "-C", target_dir, "checkout", targets[target]["commit"]], check=True)
+        env = os.environ | {
+            "GIT_CONFIG_COUNT": "1",
+            "GIT_CONFIG_KEY_0": "advice.detachedHead",
+            "GIT_CONFIG_VALUE_0": "false",
+        }
+        subprocess.run(["git", "clone", targets[target]["url"], target], env=env, check=True)
         subprocess.run(
-            ["git", "-C", target_dir, "apply", os.path.join(patches_dir, f"{target}.patch")],
+            ["git", "-C", target_dir, "checkout", targets[target]["commit"]], env=env, check=True
+        )
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                target_dir,
+                "apply",
+                os.path.join(patches_dir, f"{target}.patch"),
+            ],
+            env=env,
             check=True,
         )
 
-# parse the evaluate.h file for EvalFileDefaultNameBig, EvalFileDefaultNameSmall and download those nets
-def fetch_network(target):
-    if requests is None:
-        print("requests module not found, skipping nnue download")
-        return
-    def download_nn(net_name, output_path):
-        url = f"https://data.stockfishchess.org/nn/{net_name}"
-        response = requests.get(url, stream=True)
-
-        if response.status_code == 200:
-            with open(os.path.join(output_path, net_name), 'wb') as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    f.write(chunk)
-            print(f"Download of {net_name} successful")
-        else:
-            print(f"Error downloading {net_name}: {response.status_code}")
-
-    target_dir = os.path.join(fishes_dir, target)
-
-    with open(os.path.join(target_dir, "src", "evaluate.h"), "r") as f:
-        lines = f.readlines()
-        for line in lines:
-            if any(name in line for name in ["EvalFileDefaultNameBig", "EvalFileDefaultNameSmall", "EvalFileDefaultNameTiny"]):
-                net = line.split('"')[1]
-                print(f"Downloading https://data.stockfishchess.org/nn/{net}")
-                download_nn(net, script_dir)
 
 def clean():
-    clean_list = [
-        os.path.join(script_dir, x) for x in ["stockfishWeb.js*", "stockfishWeb.worker.js*"]
-    ]
-    clean_list.extend(glob.glob(f"{fishes_dir}/**/*.o", recursive=True))
+    clean_list = glob.glob(f"{fishes_dir}/**/*.o", recursive=True)
     for target in targets.keys():
         clean_list.append(os.path.join(fishes_dir, target, "Makefile.tmp"))
         clean_list.extend(
@@ -200,7 +228,12 @@ def clean():
 
 def assert_emsdk():
     try:
-        result = subprocess.run(['emcc', '--version'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        result = subprocess.run(
+            ["emcc", "--version"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
 
         if result.stderr:
             print("Error:", result.stderr)
