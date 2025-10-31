@@ -214,11 +214,7 @@ def fetch_sources(target):
 
 
 def clean():
-    clean_list = [
-        os.path.join(script_dir, x)
-        for x in ["stockfishWeb.js*", "stockfishWeb.worker.js*"]
-    ]
-    clean_list.extend(glob.glob(f"{fishes_dir}/**/*.o", recursive=True))
+    clean_list = glob.glob(f"{fishes_dir}/**/*.o", recursive=True)
     for target in targets.keys():
         clean_list.append(os.path.join(fishes_dir, target, "Makefile.tmp"))
         clean_list.extend(
