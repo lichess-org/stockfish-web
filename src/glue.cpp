@@ -28,7 +28,6 @@
     std::istream in(&cmd);
     if (cmd.index == 0) uci_global->engine.load_big_network(in);
     else if (cmd.index == 1) uci_global->engine.load_small_network(in);
-    //else std::cerr << "BAD_NNUE " << cmd.index << std::endl;
     return "";
   }
 

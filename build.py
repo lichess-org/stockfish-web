@@ -15,7 +15,7 @@ MAJOR = 4
 MINOR = 0
 PATCH = 18
 
-build_tags = ["all", "legacy", "dist", "default"]
+build_tags = ["all", "legacy", "dist"]
 
 targets = {
     "sf16-7": {"url": stockfish_repo, "commit": "68e1e9b", "tags": ["all", "legacy"]},
@@ -30,17 +30,26 @@ targets = {
         "commit": "e0bfc4b",
         "tags": ["all", "legacy"],
     },  # 17
-    "sf171-7": {
+    "sf17_1-7": {
         "url": stockfish_repo,
         "commit": "03e2748",
         "tags": ["all", "dist"],
-    },  # 17.1 linrock 256
-    "sf171-79": {
+    },  # 17.1
+    "sf17_1-79": {
         "url": stockfish_repo,
         "commit": "03e2748",
-        "tags": ["all", "dist", "default"],
+        "tags": ["all", "dist"],
     },  # 17.1
 }
+
+default_target = "sf17_1-79"
+
+default_cxx_flags = ["-O3", "-DNDEBUG", "--closure=1"]
+
+default_ld_flags = [
+    "-sENVIRONMENT=web,worker",
+    "-sPTHREAD_POOL_SIZE=navigator.hardwareConcurrency",
+]
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
 fishes_dir = os.path.join(script_dir, "fishes")
@@ -53,8 +62,10 @@ ignore_sources = [
 ]
 
 
-def makefile(target, sources, flags, link_flags):
-    flags = " ".join([flags.strip(), targets[target].get("cxx_flags", "").strip()])
+def makefile(target, sources, cxx_flags, ld_flags):
+    all_cxx_flags = " ".join(
+        [cxx_flags.strip(), targets[target].get("cxx", "").strip()]
+    )
     # DO NOT replace tabs with spaces
     # fmt: off
     return f"""
@@ -62,10 +73,10 @@ def makefile(target, sources, flags, link_flags):
 CXX = em++
 EXE = {target}
 
-CXX_FLAGS = {flags} -Isrc -pthread -msimd128 -mavx -flto -fno-exceptions \\
+CXX_FLAGS = {all_cxx_flags} -Isrc -pthread -msimd128 -mavx -flto -fno-exceptions \\
 	-DUSE_POPCNT -DUSE_SSE2 -DUSE_SSSE3 -DUSE_SSE41 -DNO_PREFETCH -DNNUE_EMBEDDING_OFF
 
-LD_FLAGS = {link_flags} \\
+LD_FLAGS = {ld_flags} \\
 	--pre-js=../../src/initModule.js -sEXIT_RUNTIME -sEXPORT_ES6 -sEXPORT_NAME={mod_name(target)} \\
 	-sEXPORTED_FUNCTIONS='[_malloc,_main]' -sEXPORTED_RUNTIME_METHODS='[stringToUTF8,UTF8ToString,HEAPU8]' \\
 	-sINCOMING_MODULE_JS_API='[locateFile,print,printErr,wasmMemory,buffer,instantiateWasm,mainScriptUrlOrBlob]' \\
@@ -91,22 +102,29 @@ src/glue.o: ../../src/glue.cpp
 
 
 def mod_name(target):
-    return f"{''.join(seg.capitalize() for seg in target.split('-'))}Web"
+    return "_".join(seg.capitalize() for seg in re.split(r"[_-]", target)) + "Web"
 
 
 def main():
     parser = argparse.ArgumentParser(description="build stockfish wasms")
     parser.add_argument(
-        "--flags", help="em++ cxxflags", default="-O3 -DNDEBUG --closure=1"
+        "--cxx",
+        help="em++ cxxflags. for debug use --cxx='-O0 -g3 -sSAFE_HEAP'. (default: '%(default)s')",
+        default=" ".join(default_cxx_flags),
     )
-    parser.add_argument("--node", action="store_true", help="target node.js")
     parser.add_argument(
-        "--emcc-version", action="store_true", help="print required emscripten version"
+        "--ld",
+        help="em++ linker flags. for node use --ld='-sENVIRONMENT=node'. (default: '%(default)s')",
+        default=" ".join(default_ld_flags),
+    )
+    parser.add_argument(
+        "--emcc-version", action="store_true", help="print required emscripten version and exit"
     )
     parser.add_argument(
         "target",
         nargs="*",
-        help=f"{', '.join(list(targets.keys()))}, clean, or all (default: 'sf171-79')",
+        help=f"clean, {', '.join(build_tags + list(targets.keys()))}. (default: '%(default)s')",
+        default=[default_target],
     )
 
     args = parser.parse_args()
@@ -134,19 +152,18 @@ def main():
 
     if len(arg_targets) > 0:
         assert_emsdk()
-        print(
-            f"building: {', '.join(arg_targets)}{' for node.js' if args.node else ''}"
-        )
-        print(f"flags: {args.flags}")
+        print(f"building: {', '.join(arg_targets)}")
+        print(f"cxxflags: {args.cxx}")
+        print(f"ldflags: {args.ld}")
         print("")
     try:
         for target in arg_targets:
-            build_target(target, args.flags, args.node)
+            build_target(target, args.cxx, args.ld)
     except Exception as e:
         print(e)
 
 
-def build_target(target, flags, node):  # changes cwd
+def build_target(target, cxx_flags, ld_flags):  # changes cwd
     target_dir = os.path.join(fishes_dir, target)
     fetch_sources(target)
 
@@ -158,15 +175,8 @@ def build_target(target, flags, node):  # changes cwd
 
     os.chdir(target_dir)
 
-    if not node:
-        more_flags = (
-            "-sENVIRONMENT=web,worker -sPTHREAD_POOL_SIZE=navigator.hardwareConcurrency"
-        )
-    else:
-        more_flags = "-sENVIRONMENT=node"
-
     with open("Makefile.tmp", "w") as f:
-        f.write(makefile(target, " ".join(sources), flags, more_flags))
+        f.write(makefile(target, " ".join(sources), cxx_flags, ld_flags))
 
     subprocess.run(["make", "-f", "Makefile.tmp", "-j"], check=True)
 
@@ -181,9 +191,14 @@ def fetch_sources(target):
     if not os.path.exists(target_dir):
         os.makedirs(target_dir)
         os.chdir(fishes_dir)
-        subprocess.run(["git", "clone", targets[target]["url"], target], check=True)
+        env = os.environ | {
+            "GIT_CONFIG_COUNT": "1",
+            "GIT_CONFIG_KEY_0": "advice.detachedHead",
+            "GIT_CONFIG_VALUE_0": "false",
+        }
+        subprocess.run(["git", "clone", targets[target]["url"], target], env=env, check=True)
         subprocess.run(
-            ["git", "-C", target_dir, "checkout", targets[target]["commit"]], check=True
+            ["git", "-C", target_dir, "checkout", targets[target]["commit"]], env=env, check=True
         )
         subprocess.run(
             [
@@ -193,6 +208,7 @@ def fetch_sources(target):
                 "apply",
                 os.path.join(patches_dir, f"{target}.patch"),
             ],
+            env=env,
             check=True,
         )
 

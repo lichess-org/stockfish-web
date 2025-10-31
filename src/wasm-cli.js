@@ -1,7 +1,7 @@
 import * as readline from 'node:readline';
 import * as fs from 'node:fs';
 
-const createStockfish = await import(`../${process.argv[2] ?? 'sf171-79.js'}`);
+const createStockfish = await import(`../${process.argv[2] ?? 'sf17_1-79.js'}`);
 let history = [],
   index = 0;
 
