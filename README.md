@@ -50,8 +50,8 @@ Check the output of `uci` for the correct nnue names and download ones you don't
 Now you'll have to load the nnues. (see `./src/wasm-cli.js`).
 
 ```
-big nn-1c0000000000.nnue
-small nn-37f18f62d772.nnue
+big ./nn-1c0000000000.nnue
+small ./nn-37f18f62d772.nnue
 ```
 
 _The specific file names might change, so check the output of `uci` for the correct names._

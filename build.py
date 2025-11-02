@@ -44,11 +44,14 @@ targets = {
 
 default_target = "sf17_1-79"
 
-default_cxx_flags = ["-O3", "-DNDEBUG", "--closure=1"]
+default_cxx_flags = [
+  "-O3",
+  "-DNDEBUG",
+  "--closure=1",
+]
 
 default_ld_flags = [
     "-sENVIRONMENT=web,worker",
-    "-sPTHREAD_POOL_SIZE=navigator.hardwareConcurrency",
 ]
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
