@@ -1,6 +1,8 @@
-## stockfish-web
+## Important
 
-stockfish wasms for use in lichess.org web analysis
+this package is optimized for the lichess.org website. it is not friendly or intended for external use.
+
+check out https://github.com/nmrugg/stockfish.js if you just want a browser stockfish.
 
 ## Building
 
