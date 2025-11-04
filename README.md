@@ -41,7 +41,7 @@ Edit the Stockfish sources within `./fishes`. Contribute your edits via patch fi
 ## Run locally on node
 
 ```
-./build.py --node
+./build.py --ld='-sENVIRONMENT=node'
 node ./src/wasm-cli.js ./sf17_1-79.js
 uci
 ```
