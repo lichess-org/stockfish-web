@@ -29,7 +29,7 @@ index b9d7231d..899e11f9 100644
    // for the build process (profile-build and fishtest) to work. Do not change the
    // name of the macro, as it is used in the Makefile.
 -  #define EvalFileDefaultName   "nn-5af11540bbfe.nnue"
-+  #define EvalFileDefaultName   "nn-ecb35f70ff2a.nnue"
++  #define EvalFileDefaultName   "nn-9067e33176e8.nnue"
  
    namespace NNUE {
  

@@ -65,7 +65,7 @@ _The specific file names might change, so check the output of `uci` for the corr
 - repo: https://github.com/official-stockfish/Stockfish
 - commit: [03e2748](https://github.com/official-stockfish/Stockfish/commit/03e27488f3d21d8ff4dbf3065603afa21dbd0ef3)
 - tag: sf_17.1
-- nnue: [nn-ecb35f70ff2a.nnue](https://tests.stockfishchess.org/api/nn/nn-ecb35f70ff2a.nnue)
+- nnue: [nn-9067e33176e8.nnue](https://tests.stockfishchess.org/api/nn/nn-9067e33176e8.nnue)
 
 ### sf17_1-79 (Official Stockfish 17.1 release)
 

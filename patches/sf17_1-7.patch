@@ -129,7 +129,7 @@ index 07b91400..93fc0e2b 100644
  // in the Makefile/Fishtest.
 -#define EvalFileDefaultNameBig "nn-1c0000000000.nnue"
 -#define EvalFileDefaultNameSmall "nn-37f18f62d772.nnue"
-+#define EvalFileDefaultNameBig "nn-ecb35f70ff2a.nnue"
++#define EvalFileDefaultNameBig "nn-9067e33176e8.nnue"
  
  namespace NNUE {
  struct Networks;
