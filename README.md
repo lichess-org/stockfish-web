@@ -44,21 +44,30 @@ git diff > ../../patches/sf_17.1.patch
 
 ```
 ./build.py --ld='-sENVIRONMENT=node'
-node ./src/wasm-cli.js ./sf_17.1.js
+node ./src/wasm-cli.js ./sf_18.js
 uci
 ```
+
 Check the output of `uci` for the correct nnue names and download ones you don't have from https://tests.stockfishchess.org/nns
 
 Now you'll have to load the nnues. (see `./src/wasm-cli.js`).
 
 ```
-big ./nn-1c0000000000.nnue
+big ./nn-c288c895ea92.nnue
 small ./nn-37f18f62d772.nnue
 ```
 
 _The specific file names might change, so check the output of `uci` for the correct names._
 
 ## Sources
+
+### sf_18 (Stockfish 18 pre-release)
+
+- repo: https://github.com/official-stockfish/Stockfish
+- commit: [f61d431](https://github.com/official-stockfish/Stockfish/commit/f61d4317a325db1e1489bcd257f94ef605db0244)
+- tag: *none*
+- big nnue: [nn-c288c895ea92.nnue](https://tests.stockfishchess.org/api/nn/nn-c288c895ea92.nnue)
+- small nnue: [nn-37f18f62d772.nnue](https://tests.stockfishchess.org/api/nn/nn-37f18f62d772.nnue)
 
 ### sf_17.1_smallnet (Stockfish 17.1 linrock 256)
 
