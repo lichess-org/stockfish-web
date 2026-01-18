@@ -1,32 +1,29 @@
 ## Important
 
-this package is optimized for the lichess.org website. it is not friendly or intended for external use.
+This package is optimized for the lichess.org website, supporting multiple builds and chess variants. It is not straight-forward to load and use.
 
-check out https://github.com/nmrugg/stockfish.js if you just want a browser stockfish.
+Check out https://github.com/nmrugg/stockfish.js for a simpler browser Stockfish.
 
 ## Building
 
 ```
 # Example: Clean and make all web targets
-
 ./build.py all clean
 ```
 
-use `--cxx` to override the default emcc flags which are `-O3 -DNDEBUG --closure=1`.
+Use `--cxx` to override the default emcc flags which are `-O3 -DNDEBUG --closure=1`.
 
-use `--ld` to override default linker flags (`--ld='-sENVIRONMENT=node'` to target node).
+Use `--ld` to override default linker flags (`--ld='-sENVIRONMENT=node'` to target node).
 
-check `./build.py --help` for the latest targets
+Check `./build.py --help` for the latest targets
 
-to avoid installing or changing your emscripten version, use `./build-with-docker.sh` or `./build-with-podman.sh`:
+To avoid installing or changing your emscripten version, use `./build-with-docker.sh` or `./build-with-podman.sh`:
 
 ```
 # Example: Docker clean and make all targets for node as debug with SAFE_HEAP
-
 ./build-with-docker.sh --cxx='-O0 -g3 -sSAFE_HEAP' --ld='-sENVIRONMENT=node' all clean
 
 # Example: clean and make dist targets for web with a preallocated pthread pool size of 8
-
 ./build.py --ld='-sENVIRONMENT=web,worker -sPTHREAD_POOL_SIZE=8' clean dist
 ```
 
@@ -34,17 +31,16 @@ to avoid installing or changing your emscripten version, use `./build-with-docke
 Edit the Stockfish sources within `./fishes`. Contribute your edits via patch file
 
 ```
-# Example: Update `sf17_1-7.patch` with your source changes:
-
-  cd fishes/sf17_1-7
-  git diff > ../../patches/sf17_1-7.patch
+# Example: Update `sf_17.1.patch` with your source changes:
+cd fishes/sf_17.1
+git diff > ../../patches/sf_17.1.patch
 ```
 
 ## Run locally on node
 
 ```
 ./build.py --ld='-sENVIRONMENT=node'
-node ./src/wasm-cli.js ./sf17_1-79.js
+node ./src/wasm-cli.js ./sf_17.1.js
 uci
 ```
 Check the output of `uci` for the correct nnue names and download ones you don't have from https://tests.stockfishchess.org/nns
@@ -60,14 +56,14 @@ _The specific file names might change, so check the output of `uci` for the corr
 
 ## Sources
 
-### sf17_1-7 (Stockfish 17.1 linrock 256)
+### sf_17.1_smallnet (Stockfish 17.1 linrock 256)
 
 - repo: https://github.com/official-stockfish/Stockfish
 - commit: [03e2748](https://github.com/official-stockfish/Stockfish/commit/03e27488f3d21d8ff4dbf3065603afa21dbd0ef3)
 - tag: sf_17.1
 - nnue: [nn-9067e33176e8.nnue](https://tests.stockfishchess.org/api/nn/nn-9067e33176e8.nnue)
 
-### sf17_1-79 (Official Stockfish 17.1 release)
+### sf_17.1 (Official Stockfish 17.1 release)
 
 - repo: https://github.com/official-stockfish/Stockfish
 - commit: [03e2748](https://github.com/official-stockfish/Stockfish/commit/03e27488f3d21d8ff4dbf3065603afa21dbd0ef3)
@@ -75,7 +71,7 @@ _The specific file names might change, so check the output of `uci` for the corr
 - big nnue: [nn-1c0000000000.nnue](https://tests.stockfishchess.org/api/nn/nn-1c0000000000.nnue)
 - small nnue: [nn-37f18f62d772.nnue](//tests.stockfishchess.org/api/nn/nn-37f18f62d772.nnue)
 
-### fsf14 (Fairy-Stockfish 14)
+### fsf_14 (Fairy-Stockfish 14)
 
 - repo: https://github.com/fairy-stockfish/Fairy-Stockfish
 - commit: [a621470](https://github.com/fairy-stockfish/Fairy-Stockfish/commit/a621470)

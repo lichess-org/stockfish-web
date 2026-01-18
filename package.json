@@ -8,12 +8,12 @@
   "type": "module",
   "types": "stockfishWeb.d.ts",
   "files": [
-    "sf17_1-7.js",
-    "sf17_1-7.wasm",
-    "sf17_1-79.js",
-    "sf17_1-79.wasm",
-    "fsf14.js",
-    "fsf14.wasm",
+    "sf_17.1_smallnet.js",
+    "sf_17.1_smallnet.wasm",
+    "sf_17.1.js",
+    "sf_17.1.wasm",
+    "fsf_14.js",
+    "fsf_14.wasm",
     "stockfishWeb.d.ts"
   ]
 }

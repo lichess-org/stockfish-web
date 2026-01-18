@@ -10,7 +10,6 @@ stockfish_repo = "https://github.com/official-stockfish/Stockfish"
 fairy_stockfish_repo = "https://github.com/fairy-stockfish/Fairy-Stockfish"
 
 # emscripten version requirements
-
 MAJOR = 4
 MINOR = 0
 PATCH = 18
@@ -18,31 +17,24 @@ PATCH = 18
 build_tags = ["all", "legacy", "dist"]
 
 targets = {
-    "sf16-7": {"url": stockfish_repo, "commit": "68e1e9b", "tags": ["all", "legacy"]},
-    "sf16-40": {"url": stockfish_repo, "commit": "68e1e9b", "tags": ["all", "legacy"]},
-    "fsf14": {
+    "fsf_14": {
         "url": fairy_stockfish_repo,
-        "commit": "a621470",
+        "commit": "a621470b91757699f935ba06d5f4bf48a60574b1",
         "tags": ["all", "dist"],
     },
-    "sf17-79": {
+    "sf_17.1_smallnet": {
         "url": stockfish_repo,
-        "commit": "e0bfc4b",
-        "tags": ["all", "legacy"],
-    },  # 17
-    "sf17_1-7": {
-        "url": stockfish_repo,
-        "commit": "03e2748",
+        "commit": "03e27488f3d21d8ff4dbf3065603afa21dbd0ef3",
         "tags": ["all", "dist"],
-    },  # 17.1
-    "sf17_1-79": {
+    },
+    "sf_17.1": {
         "url": stockfish_repo,
-        "commit": "03e2748",
+        "commit": "03e27488f3d21d8ff4dbf3065603afa21dbd0ef3",
         "tags": ["all", "dist"],
-    },  # 17.1
+    },
 }
 
-default_target = "sf17_1-79"
+default_target = "sf_17.1"
 
 default_cxx_flags = [
   "-O3",
@@ -105,19 +97,19 @@ src/glue.o: ../../src/glue.cpp
 
 
 def mod_name(target):
-    return "_".join(seg.capitalize() for seg in re.split(r"[_-]", target)) + "Web"
+    return "_".join(seg.capitalize() for seg in re.split(r"[._-]", target)) + "_Web"
 
 
 def main():
     parser = argparse.ArgumentParser(description="build stockfish wasms")
     parser.add_argument(
         "--cxx",
-        help="em++ cxxflags. for debug use --cxx='-O0 -g3 -sSAFE_HEAP'. (default: '%(default)s')",
+        help="em++ cxxflags. for debug use --cxx='-O0 -g3 -sSAFE_HEAP'. default: '%(default)s'",
         default=" ".join(default_cxx_flags),
     )
     parser.add_argument(
         "--ld",
-        help="em++ linker flags. for node use --ld='-sENVIRONMENT=node'. (default: '%(default)s')",
+        help="em++ linker flags. for node use --ld='-sENVIRONMENT=node'. default: '%(default)s'",
         default=" ".join(default_ld_flags),
     )
     parser.add_argument(
@@ -126,7 +118,7 @@ def main():
     parser.add_argument(
         "target",
         nargs="*",
-        help=f"clean, {', '.join(build_tags + list(targets.keys()))}. (default: '%(default)s')",
+        help=f"clean, {', '.join(build_tags + list(targets.keys()))}. default: '%(default)s'",
         default=[default_target],
     )
 
