@@ -1,6 +1,10 @@
-## Important
+# `@lichess-org/stockfish-web`
 
-This package is optimized for the lichess.org website, supporting multiple builds and chess variants. It is not straight-forward to load and use.
+![npmjs.com/package/@lichess-org/stockfish-web](https://img.shields.io/npm/v/%40lichess-org%2Fstockfish-web)
+
+WebAssembly builds for Stockfish.
+
+This package is optimized for the lichess.org website, which needs multiple builds and chess variants. It is not straight-forward to load and use.
 
 Check out https://github.com/nmrugg/stockfish.js for a simpler browser Stockfish.
 
