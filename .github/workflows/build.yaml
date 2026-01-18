@@ -1,17 +1,60 @@
-name: Release
+name: Build and Release
 
 on:
+  push:
+  pull_request:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version tag (e.g. v1.2.3)"
+        description: "Release version (e.g. v1.2.3)"
         required: true
       description:
         description: "Description"
         required: false
         default: ""
+
+permissions:
+  contents: read
+
 jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      artifact-name: dist
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Determine Emscripten version
+        id: emscripten
+        run: echo "VERSION=$(./build.py --emcc-version)" >> "$GITHUB_OUTPUT"
+
+      - name: Setup emscripten SDK
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: ${{ steps.emscripten.outputs.VERSION }}
+
+      - name: Show emcc version
+        run: emcc --version
+
+      - name: Build stockfishes
+        run: ./build.py dist
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: dist
+          path: |
+            *.js
+            *.wasm
+
   release:
+    name: Release
+    needs: build
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -22,24 +65,16 @@ jobs:
           [[ "${{ github.event.inputs.version }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$ ]] || \
           (echo "Version must start with 'v' and match 'v<major>.<minor>.<patch>'" && exit 1)
 
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v7
         with:
-          fetch-depth: 0
-          ref: ${{ github.ref }}
+          name: dist
 
-      - name: Setup emscripten
-        id: emscripten
-        run: echo "VERSION=$(./build.py --emcc-version)" >> "$GITHUB_OUTPUT"
-
-      - uses: mymindstorm/setup-emsdk@v14
-        with:
-          version: ${{ steps.emscripten.outputs.VERSION }}
-      - run: emcc --version
-
-      - name: Build stockfishes
-        run: ./build.py dist
-
-      - uses: actions/setup-node@v4
+      - name: Setup Node (for npm publish)
+        uses: actions/setup-node@v6
         with:
           registry-url: https://registry.npmjs.org/
         env:
@@ -59,7 +94,7 @@ jobs:
           npm publish --provenance --access public
           git push origin HEAD --follow-tags
 
-      - name: Publish to github
+      - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.version }}
