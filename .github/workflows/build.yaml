@@ -77,8 +77,6 @@ jobs:
         uses: actions/setup-node@v6
         with:
           registry-url: https://registry.npmjs.org/
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
 
       - name: Bump package.json
         run: |
