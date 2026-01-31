@@ -34,12 +34,12 @@ targets = {
     },
     "sf_18_smallnet": {
         "url": stockfish_repo,
-        "commit": "f61d4317a325db1e1489bcd257f94ef605db0244",
+        "commit": "cb3d4ee9b47d0c5aae855b12379378ea1439675c",
         "tags": ["all", "dist"],
     },
     "sf_18": {
         "url": stockfish_repo,
-        "commit": "f61d4317a325db1e1489bcd257f94ef605db0244",
+        "commit": "cb3d4ee9b47d0c5aae855b12379378ea1439675c",
         "tags": ["all", "dist"],
     },
 }

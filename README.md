@@ -61,17 +61,17 @@ _The specific file names might change, so check the output of `uci` for the corr
 
 ## Sources
 
-### sf_18_smallnet (Stockfish 18 pre-release with sscg13 smallnet)
+### sf_18_smallnet (Stockfish 18 with sscg13 smallnet)
 
 - repo: https://github.com/official-stockfish/Stockfish
-- commit: [f61d431](https://github.com/official-stockfish/Stockfish/commit/f61d4317a325db1e1489bcd257f94ef605db0244)
+- commit: [cb3d4ee](https://github.com/official-stockfish/Stockfish/commit/cb3d4ee9b47d0c5aae855b12379378ea1439675c)
 - tag: *none* (patch includes rebase of https://github.com/sscg13/Stockfish/tree/threat-small)
 - nnue: [nn-4ca89e4b3abf.nnue](https://tests.stockfishchess.org/api/nn/nn-4ca89e4b3abf.nnue)
 
-### sf_18 (Stockfish 18 pre-release)
+### sf_18 (Stockfish 18)
 
 - repo: https://github.com/official-stockfish/Stockfish
-- commit: [f61d431](https://github.com/official-stockfish/Stockfish/commit/f61d4317a325db1e1489bcd257f94ef605db0244)
+- commit: [cb3d4ee](https://github.com/official-stockfish/Stockfish/commit/cb3d4ee9b47d0c5aae855b12379378ea1439675c)
 - tag: *none*
 - big nnue: [nn-c288c895ea92.nnue](https://tests.stockfishchess.org/api/nn/nn-c288c895ea92.nnue)
 - small nnue: [nn-37f18f62d772.nnue](https://tests.stockfishchess.org/api/nn/nn-37f18f62d772.nnue)
