@@ -32,7 +32,14 @@
   }
 
   namespace Stockfish::Tablebases {
+    // Stockfish 17
     Config rank_root_moves(const OptionsMap& o, Position& p, Search::RootMoves& rM, bool rankDTZ) {
+      for (auto& m: rM) m.tbRank = 0;
+      return Config();
+    }
+    // Stockfish 18+
+    Config rank_root_moves(const OptionsMap& o, Position& p, Search::RootMoves& rM, bool rankDTZ, const std::function<bool()>& timeAbort) {
+      for (auto& m: rM) m.tbRank = 0;
       return Config();
     }
   }
@@ -65,8 +72,14 @@ EMSCRIPTEN_KEEPALIVE std::string js_getline() {
 namespace Stockfish::Tablebases {
   int MaxCardinality = 0;
   void init(const std::string& paths) {}
-  WDLScore probe_wdl(Position& p, ProbeState* r) { return WDLDraw; }
-  int probe_dtz(Position& p, ProbeState* r) { return 0; }
+  WDLScore probe_wdl(Position& p, ProbeState* r) {
+    *r = ProbeState::FAIL;
+    return WDLDraw;
+  }
+  int probe_dtz(Position& p, ProbeState* r) {
+    *r = ProbeState::FAIL;
+    return 0;
+  }
 
   bool root_probe(Position& p, Search::RootMoves& rM) { return false; }
   bool root_probe_wdl(Position& p, Search::RootMoves& rM) { return false; }

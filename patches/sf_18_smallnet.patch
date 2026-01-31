@@ -1,0 +1,528 @@
+diff --git a/scripts/net.sh b/scripts/net.sh
+index 1aa1fbfb..50dd30a4 100755
+--- a/scripts/net.sh
++++ b/scripts/net.sh
+@@ -72,5 +72,4 @@ fetch_network() {
+   return 1
+ }
+ 
+-fetch_network EvalFileDefaultNameBig && \
+-fetch_network EvalFileDefaultNameSmall
++fetch_network EvalFileDefaultNameBig
+diff --git a/src/engine.cpp b/src/engine.cpp
+index dfd2099d..a43821ba 100644
+--- a/src/engine.cpp
++++ b/src/engine.cpp
+@@ -65,8 +65,7 @@ Engine::Engine(std::optional<std::string> path) :
+     threads(),
+     networks(numaContext,
+              // Heap-allocate because sizeof(NN::Networks) is large
+-             std::make_unique<NN::Networks>(NN::EvalFile{EvalFileDefaultNameBig, "None", ""},
+-                                            NN::EvalFile{EvalFileDefaultNameSmall, "None", ""})) {
++             std::make_unique<NN::Networks>(NN::EvalFile{EvalFileDefaultNameBig, "None", ""})) {
+ 
+     pos.set(StartFEN, false, &states->back());
+ 
+@@ -141,12 +140,6 @@ Engine::Engine(std::optional<std::string> path) :
+           return std::nullopt;
+       }));
+ 
+-    options.add(  //
+-      "EvalFileSmall", Option(EvalFileDefaultNameSmall, [this](const Option& o) {
+-          load_small_network(o);
+-          return std::nullopt;
+-      }));
+-
+     load_networks();
+     resize_threads();
+ }
+@@ -261,7 +254,6 @@ void Engine::set_ponderhit(bool b) { threads.main_manager()->ponder = b; }
+ 
+ void Engine::verify_networks() const {
+     networks->big.verify(options["EvalFile"], onVerifyNetworks);
+-    networks->small.verify(options["EvalFileSmall"], onVerifyNetworks);
+ 
+     auto statuses = networks.get_status_and_errors();
+     for (size_t i = 0; i < statuses.size(); ++i)
+@@ -297,7 +289,6 @@ void Engine::verify_networks() const {
+ void Engine::load_networks() {
+     networks.modify_and_replicate([this](NN::Networks& networks_) {
+         networks_.big.load(binaryDirectory, options["EvalFile"]);
+-        networks_.small.load(binaryDirectory, options["EvalFileSmall"]);
+     });
+     threads.clear();
+     threads.ensure_network_replicated();
+@@ -310,17 +301,9 @@ void Engine::load_big_network(const std::string& file) {
+     threads.ensure_network_replicated();
+ }
+ 
+-void Engine::load_small_network(const std::string& file) {
+-    networks.modify_and_replicate(
+-      [this, &file](NN::Networks& networks_) { networks_.small.load(binaryDirectory, file); });
+-    threads.clear();
+-    threads.ensure_network_replicated();
+-}
+-
+ void Engine::save_network(const std::pair<std::optional<std::string>, std::string> files[2]) {
+     networks.modify_and_replicate([&files](NN::Networks& networks_) {
+         networks_.big.save(files[0].first);
+-        networks_.small.save(files[1].first);
+     });
+ }
+ 
+diff --git a/src/engine.h b/src/engine.h
+index 10c92d75..6a1a31e3 100644
+--- a/src/engine.h
++++ b/src/engine.h
+@@ -88,9 +88,17 @@ class Engine {
+     void verify_networks() const;
+     void load_networks();
+     void load_big_network(const std::string& file);
+-    void load_small_network(const std::string& file);
+     void save_network(const std::pair<std::optional<std::string>, std::string> files[2]);
+ 
++    void load_big_network(std::istream& is) {
++        networks.modify_and_replicate(
++          [this, &is](auto& networks_) { networks_.big.load(is); });
++        threads.clear();
++        threads.ensure_network_replicated();
++    }
++
++    void load_small_network(std::istream& is) {}
++
+     // utility functions
+ 
+     void trace_eval() const;
+diff --git a/src/evaluate.cpp b/src/evaluate.cpp
+index 745bd3e4..29846c17 100644
+--- a/src/evaluate.cpp
++++ b/src/evaluate.cpp
+@@ -58,20 +58,10 @@ Value Eval::evaluate(const Eval::NNUE::Networks&    networks,
+ 
+     assert(!pos.checkers());
+ 
+-    bool smallNet           = use_smallnet(pos);
+-    auto [psqt, positional] = smallNet ? networks.small.evaluate(pos, accumulators, caches.small)
+-                                       : networks.big.evaluate(pos, accumulators, caches.big);
++    auto [psqt, positional] = networks.big.evaluate(pos, accumulators, caches.big);
+ 
+     Value nnue = (125 * psqt + 131 * positional) / 128;
+ 
+-    // Re-evaluate the position when higher eval accuracy is worth the time spent
+-    if (smallNet && (std::abs(nnue) < 277))
+-    {
+-        std::tie(psqt, positional) = networks.big.evaluate(pos, accumulators, caches.big);
+-        nnue                       = (125 * psqt + 131 * positional) / 128;
+-        smallNet                   = false;
+-    }
+-
+     // Blend optimism and eval with nnue complexity
+     int nnueComplexity = std::abs(psqt - positional);
+     optimism += optimism * nnueComplexity / 476;
+diff --git a/src/evaluate.h b/src/evaluate.h
+index b4f54a38..887f6c4e 100644
+--- a/src/evaluate.h
++++ b/src/evaluate.h
+@@ -33,8 +33,7 @@ namespace Eval {
+ // for the build process (profile-build and fishtest) to work. Do not change the
+ // name of the macro or the location where this macro is defined, as it is used
+ // in the Makefile/Fishtest.
+-#define EvalFileDefaultNameBig "nn-c288c895ea92.nnue"
+-#define EvalFileDefaultNameSmall "nn-37f18f62d772.nnue"
++#define EvalFileDefaultNameBig "nn-4ca89e4b3abf.nnue"
+ 
+ namespace NNUE {
+ struct Networks;
+diff --git a/src/main.cpp b/src/main.cpp
+index 9a7376ef..4aa374f0 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -27,17 +27,22 @@
+ 
+ using namespace Stockfish;
+ 
++UCIEngine* uci_global;
++
+ int main(int argc, char* argv[]) {
+     std::cout << engine_info() << std::endl;
+ 
+     Bitboards::init();
+     Position::init();
+ 
+-    auto uci = std::make_unique<UCIEngine>(argc, argv);
++    uci_global = new UCIEngine(0, nullptr);
+ 
+-    Tune::init(uci->engine_options());
++    Tune::init(uci_global->engine_options());
+ 
+-    uci->loop();
++    uci_global->loop();
++
++    delete uci_global;
++    uci_global = nullptr;
+ 
+     return 0;
+ }
+diff --git a/src/misc.cpp b/src/misc.cpp
+index 5f8f31a9..c00d4a32 100644
+--- a/src/misc.cpp
++++ b/src/misc.cpp
+@@ -480,6 +480,7 @@ bool is_whitespace(std::string_view s) {
+ }
+ 
+ std::string CommandLine::get_binary_directory(std::string argv0) {
++    return "";
+     std::string pathSeparator;
+ 
+ #ifdef _WIN32
+@@ -514,6 +515,7 @@ std::string CommandLine::get_binary_directory(std::string argv0) {
+ }
+ 
+ std::string CommandLine::get_working_directory() {
++    return "";
+     std::string workingDirectory = "";
+     char        buff[40000];
+     char*       cwd = GETCWD(buff, 40000);
+diff --git a/src/nnue/network.cpp b/src/nnue/network.cpp
+index d1f2b14c..fd976288 100644
+--- a/src/nnue/network.cpp
++++ b/src/nnue/network.cpp
+@@ -45,14 +45,10 @@
+ // Note that this does not work in Microsoft Visual Studio.
+ #if !defined(_MSC_VER) && !defined(NNUE_EMBEDDING_OFF)
+ INCBIN(EmbeddedNNUEBig, EvalFileDefaultNameBig);
+-INCBIN(EmbeddedNNUESmall, EvalFileDefaultNameSmall);
+ #else
+ const unsigned char        gEmbeddedNNUEBigData[1]   = {0x0};
+ const unsigned char* const gEmbeddedNNUEBigEnd       = &gEmbeddedNNUEBigData[1];
+ const unsigned int         gEmbeddedNNUEBigSize      = 1;
+-const unsigned char        gEmbeddedNNUESmallData[1] = {0x0};
+-const unsigned char* const gEmbeddedNNUESmallEnd     = &gEmbeddedNNUESmallData[1];
+-const unsigned int         gEmbeddedNNUESmallSize    = 1;
+ #endif
+ 
+ namespace {
+@@ -72,10 +68,7 @@ struct EmbeddedNNUE {
+ using namespace Stockfish::Eval::NNUE;
+ 
+ EmbeddedNNUE get_embedded(EmbeddedNNUEType type) {
+-    if (type == EmbeddedNNUEType::BIG)
+-        return EmbeddedNNUE(gEmbeddedNNUEBigData, gEmbeddedNNUEBigEnd, gEmbeddedNNUEBigSize);
+-    else
+-        return EmbeddedNNUE(gEmbeddedNNUESmallData, gEmbeddedNNUESmallEnd, gEmbeddedNNUESmallSize);
++    return EmbeddedNNUE(gEmbeddedNNUEBigData, gEmbeddedNNUEBigEnd, gEmbeddedNNUEBigSize);
+ }
+ 
+ }
+@@ -192,6 +185,8 @@ Network<Arch, Transformer>::evaluate(const Position&                         pos
+ template<typename Arch, typename Transformer>
+ void Network<Arch, Transformer>::verify(std::string                                  evalfilePath,
+                                         const std::function<void(std::string_view)>& f) const {
++    return;  // Yep
++
+     if (evalfilePath.empty())
+         evalfilePath = evalFile.defaultName;
+ 
+@@ -410,7 +405,4 @@ bool Network<Arch, Transformer>::write_parameters(std::ostream&      stream,
+ template class Network<NetworkArchitecture<TransformedFeatureDimensionsBig, L2Big, L3Big>,
+                        FeatureTransformer<TransformedFeatureDimensionsBig>>;
+ 
+-template class Network<NetworkArchitecture<TransformedFeatureDimensionsSmall, L2Small, L3Small>,
+-                       FeatureTransformer<TransformedFeatureDimensionsSmall>>;
+-
+ }  // namespace Stockfish::Eval::NNUE
+diff --git a/src/nnue/network.h b/src/nnue/network.h
+index cb433718..b7477189 100644
+--- a/src/nnue/network.h
++++ b/src/nnue/network.h
+@@ -45,7 +45,6 @@ namespace Stockfish::Eval::NNUE {
+ 
+ enum class EmbeddedNNUEType {
+     BIG,
+-    SMALL,
+ };
+ 
+ using NetworkOutput = std::tuple<Value, Value>;
+@@ -83,14 +82,15 @@ class Network {
+                                  AccumulatorStack&                       accumulatorStack,
+                                  AccumulatorCaches::Cache<FTDimensions>& cache) const;
+ 
++    std::optional<std::string> load(std::istream&);
++
+    private:
+     void load_user_net(const std::string&, const std::string&);
+     void load_internal();
+ 
+     void initialize();
+ 
+-    bool                       save(std::ostream&, const std::string&, const std::string&) const;
+-    std::optional<std::string> load(std::istream&);
++    bool save(std::ostream&, const std::string&, const std::string&) const;
+ 
+     bool read_header(std::istream&, std::uint32_t*, std::string*) const;
+     bool write_header(std::ostream&, std::uint32_t, const std::string&) const;
+@@ -117,24 +117,18 @@ class Network {
+ };
+ 
+ // Definitions of the network types
+-using SmallFeatureTransformer = FeatureTransformer<TransformedFeatureDimensionsSmall>;
+-using SmallNetworkArchitecture =
+-  NetworkArchitecture<TransformedFeatureDimensionsSmall, L2Small, L3Small>;
+ 
+ using BigFeatureTransformer  = FeatureTransformer<TransformedFeatureDimensionsBig>;
+ using BigNetworkArchitecture = NetworkArchitecture<TransformedFeatureDimensionsBig, L2Big, L3Big>;
+ 
+ using NetworkBig   = Network<BigNetworkArchitecture, BigFeatureTransformer>;
+-using NetworkSmall = Network<SmallNetworkArchitecture, SmallFeatureTransformer>;
+ 
+ 
+ struct Networks {
+-    Networks(EvalFile bigFile, EvalFile smallFile) :
+-        big(bigFile, EmbeddedNNUEType::BIG),
+-        small(smallFile, EmbeddedNNUEType::SMALL) {}
++    Networks(EvalFile bigFile) :
++        big(bigFile, EmbeddedNNUEType::BIG) {}
+ 
+     NetworkBig   big;
+-    NetworkSmall small;
+ };
+ 
+ 
+@@ -153,7 +147,6 @@ struct std::hash<Stockfish::Eval::NNUE::Networks> {
+     std::size_t operator()(const Stockfish::Eval::NNUE::Networks& networks) const noexcept {
+         std::size_t h = 0;
+         Stockfish::hash_combine(h, networks.big);
+-        Stockfish::hash_combine(h, networks.small);
+         return h;
+     }
+ };
+diff --git a/src/nnue/nnue_accumulator.cpp b/src/nnue/nnue_accumulator.cpp
+index 16af8d5f..b419c101 100644
+--- a/src/nnue/nnue_accumulator.cpp
++++ b/src/nnue/nnue_accumulator.cpp
+@@ -142,7 +142,7 @@ template<IndexType Dimensions>
+ void AccumulatorStack::evaluate(const Position&                       pos,
+                                 const FeatureTransformer<Dimensions>& featureTransformer,
+                                 AccumulatorCaches::Cache<Dimensions>& cache) noexcept {
+-    constexpr bool UseThreats = (Dimensions == TransformedFeatureDimensionsBig);
++    constexpr bool UseThreats = true;
+ 
+     evaluate_side<PSQFeatureSet>(WHITE, pos, featureTransformer, cache);
+ 
+@@ -283,10 +283,6 @@ template void AccumulatorStack::evaluate<TransformedFeatureDimensionsBig>(
+   const Position&                                            pos,
+   const FeatureTransformer<TransformedFeatureDimensionsBig>& featureTransformer,
+   AccumulatorCaches::Cache<TransformedFeatureDimensionsBig>& cache) noexcept;
+-template void AccumulatorStack::evaluate<TransformedFeatureDimensionsSmall>(
+-  const Position&                                              pos,
+-  const FeatureTransformer<TransformedFeatureDimensionsSmall>& featureTransformer,
+-  AccumulatorCaches::Cache<TransformedFeatureDimensionsSmall>& cache) noexcept;
+ 
+ 
+ namespace {
+diff --git a/src/nnue/nnue_accumulator.h b/src/nnue/nnue_accumulator.h
+index 438074f4..28e9b985 100644
+--- a/src/nnue/nnue_accumulator.h
++++ b/src/nnue/nnue_accumulator.h
+@@ -98,53 +98,40 @@ struct AccumulatorCaches {
+     template<typename Networks>
+     void clear(const Networks& networks) {
+         big.clear(networks.big);
+-        small.clear(networks.small);
+     }
+ 
+     Cache<TransformedFeatureDimensionsBig>   big;
+-    Cache<TransformedFeatureDimensionsSmall> small;
+ };
+ 
+ 
+ template<typename FeatureSet>
+ struct AccumulatorState {
+     Accumulator<TransformedFeatureDimensionsBig>   accumulatorBig;
+-    Accumulator<TransformedFeatureDimensionsSmall> accumulatorSmall;
+     typename FeatureSet::DiffType                  diff;
+ 
+     template<IndexType Size>
+     auto& acc() noexcept {
+-        static_assert(Size == TransformedFeatureDimensionsBig
+-                        || Size == TransformedFeatureDimensionsSmall,
++        static_assert(Size == TransformedFeatureDimensionsBig,
+                       "Invalid size for accumulator");
+ 
+-        if constexpr (Size == TransformedFeatureDimensionsBig)
+-            return accumulatorBig;
+-        else if constexpr (Size == TransformedFeatureDimensionsSmall)
+-            return accumulatorSmall;
++        return accumulatorBig;
+     }
+ 
+     template<IndexType Size>
+     const auto& acc() const noexcept {
+-        static_assert(Size == TransformedFeatureDimensionsBig
+-                        || Size == TransformedFeatureDimensionsSmall,
++        static_assert(Size == TransformedFeatureDimensionsBig,
+                       "Invalid size for accumulator");
+ 
+-        if constexpr (Size == TransformedFeatureDimensionsBig)
+-            return accumulatorBig;
+-        else if constexpr (Size == TransformedFeatureDimensionsSmall)
+-            return accumulatorSmall;
++        return accumulatorBig;
+     }
+ 
+     void reset(const typename FeatureSet::DiffType& dp) noexcept {
+         diff = dp;
+         accumulatorBig.computed.fill(false);
+-        accumulatorSmall.computed.fill(false);
+     }
+ 
+     typename FeatureSet::DiffType& reset() noexcept {
+         accumulatorBig.computed.fill(false);
+-        accumulatorSmall.computed.fill(false);
+         return diff;
+     }
+ };
+diff --git a/src/nnue/nnue_architecture.h b/src/nnue/nnue_architecture.h
+index 71fce9bd..23be3d09 100644
+--- a/src/nnue/nnue_architecture.h
++++ b/src/nnue/nnue_architecture.h
+@@ -40,14 +40,10 @@ using ThreatFeatureSet = Features::FullThreats;
+ using PSQFeatureSet    = Features::HalfKAv2_hm;
+ 
+ // Number of input feature dimensions after conversion
+-constexpr IndexType TransformedFeatureDimensionsBig = 1024;
++constexpr IndexType TransformedFeatureDimensionsBig = 128;
+ constexpr int       L2Big                           = 15;
+ constexpr int       L3Big                           = 32;
+ 
+-constexpr IndexType TransformedFeatureDimensionsSmall = 128;
+-constexpr int       L2Small                           = 15;
+-constexpr int       L3Small                           = 32;
+-
+ constexpr IndexType PSQTBuckets = 8;
+ constexpr IndexType LayerStacks = 8;
+ 
+diff --git a/src/nnue/nnue_feature_transformer.h b/src/nnue/nnue_feature_transformer.h
+index f4cf348a..c42a1fd4 100644
+--- a/src/nnue/nnue_feature_transformer.h
++++ b/src/nnue/nnue_feature_transformer.h
+@@ -80,8 +80,7 @@ void permute(std::array<T, N>& data, const std::array<std::size_t, OrderSize>& o
+ // Input feature converter
+ template<IndexType TransformedFeatureDimensions>
+ class FeatureTransformer {
+-    static constexpr bool UseThreats =
+-      (TransformedFeatureDimensions == TransformedFeatureDimensionsBig);
++    static constexpr bool UseThreats = true;
+     // Number of output dimensions for one side
+     static constexpr IndexType HalfDimensions = TransformedFeatureDimensions;
+ 
+diff --git a/src/shm.h b/src/shm.h
+index e1256b26..176d1988 100644
+--- a/src/shm.h
++++ b/src/shm.h
+@@ -36,7 +36,7 @@
+ #include <utility>
+ #include <variant>
+ 
+-#if defined(__linux__) && !defined(__ANDROID__)
++#if defined(__linux__) && !defined(__ANDROID__) && !defined(__EMSCRIPTEN__)
+     #include "shm_linux.h"
+ #endif
+ 
+@@ -137,7 +137,7 @@ inline std::string getExecutablePathHash() {
+         path_length          = len;
+     }
+ 
+-#elif defined(__linux__)
++#elif defined(__linux__) && !defined(__EMSCRIPTEN__)
+     ssize_t len = readlink("/proc/self/exe", executable_path, sizeof(executable_path) - 1);
+     if (len >= 0)
+     {
+@@ -407,7 +407,7 @@ class SharedMemoryBackend {
+     std::string last_error_message;
+ };
+ 
+-#elif defined(__linux__) && !defined(__ANDROID__)
++#elif defined(__linux__) && !defined(__ANDROID__) && !defined(__EMSCRIPTEN__)
+ 
+ template<typename T>
+ class SharedMemoryBackend {
+@@ -538,7 +538,7 @@ struct SystemWideSharedConstant {
+         std::snprintf(buf, sizeof(buf), "Local\\sf_%zu$%zu$%zu", content_hash, executable_hash, discriminator);
+         std::string shm_name = buf;
+ 
+-#if defined(__linux__) && !defined(__ANDROID__)
++#if defined(__linux__) && !defined(__ANDROID__) && !defined(__EMSCRIPTEN__)
+         // POSIX shared memory names must start with a slash
+         shm_name = "/sf_" + createHashString(shm_name);
+ 
+diff --git a/src/timeman.h b/src/timeman.h
+index 08e8da10..917d27ec 100644
+--- a/src/timeman.h
++++ b/src/timeman.h
+@@ -48,7 +48,7 @@ class TimeManagement {
+     TimePoint elapsed(FUNC nodes) const {
+         return useNodesTime ? TimePoint(nodes()) : elapsed_time();
+     }
+-    TimePoint elapsed_time() const { return now() - startTime; };
++    TimePoint elapsed_time() const { return std::max(now() - startTime, TimePoint(1)); };
+ 
+     void clear();
+     void advance_nodes_time(std::int64_t nodes);
+diff --git a/src/uci.cpp b/src/uci.cpp
+index 92700768..622cc593 100644
+--- a/src/uci.cpp
++++ b/src/uci.cpp
+@@ -39,6 +39,8 @@
+ #include "types.h"
+ #include "ucioption.h"
+ 
++std::string js_getline();  // src/dualnet-glue.cpp
++
+ namespace Stockfish {
+ 
+ constexpr auto BenchmarkCommand = "speedtest";
+@@ -65,8 +67,8 @@ void UCIEngine::print_info_string(std::string_view str) {
+ }
+ 
+ UCIEngine::UCIEngine(int argc, char** argv) :
+-    engine(argv[0]),
+-    cli(argc, argv) {
++    engine(),
++    cli(0, nullptr) {
+ 
+     engine.get_options().add_info_listener([](const std::optional<std::string>& str) {
+         if (str.has_value())
+@@ -97,6 +99,8 @@ void UCIEngine::loop() {
+             && !getline(std::cin, cmd))  // Wait for an input or an end-of-file (EOF) indication
+             cmd = "quit";
+ 
++        cmd = js_getline();
++
+         std::istringstream is(cmd);
+ 
+         token.clear();  // Avoid a stale if getline() returns nothing or a blank line
+@@ -175,7 +179,7 @@ void UCIEngine::loop() {
+             sync_cout << "Unknown command: '" << cmd << "'. Type help for more information."
+                       << sync_endl;
+ 
+-    } while (token != "quit" && cli.argc == 1);  // The command-line arguments are one-shot
++    } while (token != "quit");  // The command-line arguments are one-shot
+ }
+ 
+ Search::LimitsType UCIEngine::parse_limits(std::istream& is) {
+diff --git a/src/uci.h b/src/uci.h
+index ebc04fc3..5350eb27 100644
+--- a/src/uci.h
++++ b/src/uci.h
+@@ -54,8 +54,9 @@ class UCIEngine {
+ 
+     auto& engine_options() { return engine.get_options(); }
+ 
+-   private:
+     Engine      engine;
++
++   private:
+     CommandLine cli;
+ 
+     static void print_info_string(std::string_view str);

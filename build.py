@@ -25,16 +25,26 @@ targets = {
     "sf_17.1_smallnet": {
         "url": stockfish_repo,
         "commit": "03e27488f3d21d8ff4dbf3065603afa21dbd0ef3",
-        "tags": ["all", "dist"],
+        "tags": ["all", "legacy"],
     },
     "sf_17.1": {
         "url": stockfish_repo,
         "commit": "03e27488f3d21d8ff4dbf3065603afa21dbd0ef3",
+        "tags": ["all", "legacy"],
+    },
+    "sf_18_smallnet": {
+        "url": stockfish_repo,
+        "commit": "cb3d4ee9b47d0c5aae855b12379378ea1439675c",
+        "tags": ["all", "dist"],
+    },
+    "sf_18": {
+        "url": stockfish_repo,
+        "commit": "cb3d4ee9b47d0c5aae855b12379378ea1439675c",
         "tags": ["all", "dist"],
     },
 }
 
-default_target = "sf_17.1"
+default_target = "sf_18_smallnet"
 
 default_cxx_flags = [
   "-O3",

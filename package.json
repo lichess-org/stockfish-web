@@ -8,10 +8,10 @@
   "type": "module",
   "types": "stockfishWeb.d.ts",
   "files": [
-    "sf_17.1_smallnet.js",
-    "sf_17.1_smallnet.wasm",
-    "sf_17.1.js",
-    "sf_17.1.wasm",
+    "sf_18_smallnet.js",
+    "sf_18_smallnet.wasm",
+    "sf_18.js",
+    "sf_18.wasm",
     "fsf_14.js",
     "fsf_14.wasm",
     "stockfishWeb.d.ts"
