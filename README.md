@@ -65,14 +65,14 @@ _The specific file names might change, so check the output of `uci` for the corr
 
 - repo: https://github.com/official-stockfish/Stockfish
 - commit: [cb3d4ee](https://github.com/official-stockfish/Stockfish/commit/cb3d4ee9b47d0c5aae855b12379378ea1439675c)
-- tag: *none* (patch includes rebase of https://github.com/sscg13/Stockfish/tree/threat-small)
+- tag: sf_18 (patch includes rebase of https://github.com/sscg13/Stockfish/tree/threat-small)
 - nnue: [nn-4ca89e4b3abf.nnue](https://tests.stockfishchess.org/api/nn/nn-4ca89e4b3abf.nnue)
 
 ### sf_18 (Stockfish 18)
 
 - repo: https://github.com/official-stockfish/Stockfish
 - commit: [cb3d4ee](https://github.com/official-stockfish/Stockfish/commit/cb3d4ee9b47d0c5aae855b12379378ea1439675c)
-- tag: *none*
+- tag: sf_18
 - big nnue: [nn-c288c895ea92.nnue](https://tests.stockfishchess.org/api/nn/nn-c288c895ea92.nnue)
 - small nnue: [nn-37f18f62d772.nnue](https://tests.stockfishchess.org/api/nn/nn-37f18f62d772.nnue)
 
