@@ -19,6 +19,7 @@ Module['setNnueBuffer'] = function (buf, index = 0) {
   if (buf.byteLength <= 0) throw new Error(`${buf.byteLength} bytes?`);
   const heapBuf = _malloc(buf.byteLength); // deallocated in src/wasm/glue.cpp
   if (!heapBuf) throw new Error(`could not allocate ${buf.byteLength} bytes`);
+  growMemViews(); // refresh HEAPU8 after allocation
   Module['HEAPU8'].set(buf, heapBuf);
   _setNnueBuffer(heapBuf, buf.byteLength, index);
 };
