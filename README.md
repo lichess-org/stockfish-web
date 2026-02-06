@@ -61,7 +61,7 @@ _The specific file names might change, so check the output of `uci` for the corr
 
 ## Sources
 
-### sf_18_smallnet (Stockfish 18 with sscg13 smallnet)
+### sf_18_smallnet (Stockfish 18 with sscg13/threat-small)
 
 - repo: https://github.com/official-stockfish/Stockfish
 - commit: [cb3d4ee9](https://github.com/official-stockfish/Stockfish/commit/cb3d4ee9b47d0c5aae855b12379378ea1439675c)
