@@ -64,16 +64,24 @@ _The specific file names might change, so check the output of `uci` for the corr
 ### sf_18_smallnet (Stockfish 18 with sscg13 smallnet)
 
 - repo: https://github.com/official-stockfish/Stockfish
-- commit: [cb3d4ee](https://github.com/official-stockfish/Stockfish/commit/cb3d4ee9b47d0c5aae855b12379378ea1439675c)
+- commit: [cb3d4ee9](https://github.com/official-stockfish/Stockfish/commit/cb3d4ee9b47d0c5aae855b12379378ea1439675c)
 - tag: sf_18 (patch includes rebase of https://github.com/sscg13/Stockfish/tree/threat-small)
 - nnue: [nn-4ca89e4b3abf.nnue](https://tests.stockfishchess.org/api/nn/nn-4ca89e4b3abf.nnue)
 
 ### sf_18 (Stockfish 18)
 
 - repo: https://github.com/official-stockfish/Stockfish
-- commit: [cb3d4ee](https://github.com/official-stockfish/Stockfish/commit/cb3d4ee9b47d0c5aae855b12379378ea1439675c)
+- commit: [cb3d4ee9](https://github.com/official-stockfish/Stockfish/commit/cb3d4ee9b47d0c5aae855b12379378ea1439675c)
 - tag: sf_18
 - big nnue: [nn-c288c895ea92.nnue](https://tests.stockfishchess.org/api/nn/nn-c288c895ea92.nnue)
+- small nnue: [nn-37f18f62d772.nnue](https://tests.stockfishchess.org/api/nn/nn-37f18f62d772.nnue)
+
+### sf_dev (Stockfish dev-20260204-fac506bd)
+
+- repo: https://github.com/official-stockfish/Stockfish
+- commit: [fac506bd](https://github.com/official-stockfish/Stockfish/commit/fac506bdf3f0ed46fd0823ff1ed592824f91aa5a)
+- tag: stockfish-dev-20260204-fac506bd
+- big nnue: [nn-3dd094f3dfcf.nnue](https://tests.stockfishchess.org/api/nn/nn-3dd094f3dfcf.nnue)
 - small nnue: [nn-37f18f62d772.nnue](https://tests.stockfishchess.org/api/nn/nn-37f18f62d772.nnue)
 
 ### sf_17.1_smallnet (Stockfish 17.1 linrock 256)
@@ -86,7 +94,7 @@ _The specific file names might change, so check the output of `uci` for the corr
 ### sf_17.1 (Official Stockfish 17.1 release)
 
 - repo: https://github.com/official-stockfish/Stockfish
-- commit: [03e2748](https://github.com/official-stockfish/Stockfish/commit/03e27488f3d21d8ff4dbf3065603afa21dbd0ef3)
+- commit: [03e27488](https://github.com/official-stockfish/Stockfish/commit/03e27488f3d21d8ff4dbf3065603afa21dbd0ef3)
 - tag: sf_17.1
 - big nnue: [nn-1c0000000000.nnue](https://tests.stockfishchess.org/api/nn/nn-1c0000000000.nnue)
 - small nnue: [nn-37f18f62d772.nnue](//tests.stockfishchess.org/api/nn/nn-37f18f62d772.nnue)
@@ -94,5 +102,5 @@ _The specific file names might change, so check the output of `uci` for the corr
 ### fsf_14 (Fairy-Stockfish 14)
 
 - repo: https://github.com/fairy-stockfish/Fairy-Stockfish
-- commit: [a621470](https://github.com/fairy-stockfish/Fairy-Stockfish/commit/a621470)
+- commit: [a621470b](https://github.com/fairy-stockfish/Fairy-Stockfish/commit/a621470b91757699f935ba06d5f4bf48a60574b1)
 - nnues: see repo links

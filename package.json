@@ -12,6 +12,8 @@
     "sf_18_smallnet.wasm",
     "sf_18.js",
     "sf_18.wasm",
+    "sf_dev.js",
+    "sf_dev.wasm",
     "fsf_14.js",
     "fsf_14.wasm",
     "stockfishWeb.d.ts"

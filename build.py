@@ -42,6 +42,11 @@ targets = {
         "commit": "cb3d4ee9b47d0c5aae855b12379378ea1439675c",
         "tags": ["all", "dist"],
     },
+    "sf_dev": {
+        "url": stockfish_repo,
+        "commit": "fac506bdf3f0ed46fd0823ff1ed592824f91aa5a",
+        "tags": ["all", "dist"],
+    },
 }
 
 default_target = "sf_18_smallnet"
