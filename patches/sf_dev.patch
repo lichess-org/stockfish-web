@@ -1,0 +1,220 @@
+diff --git a/src/engine.h b/src/engine.h
+index 10c92d75..436830c8 100644
+--- a/src/engine.h
++++ b/src/engine.h
+@@ -91,6 +91,20 @@ class Engine {
+     void load_small_network(const std::string& file);
+     void save_network(const std::pair<std::optional<std::string>, std::string> files[2]);
+ 
++    void load_big_network(std::istream& is) {
++        networks.modify_and_replicate(
++          [this, &is](auto& networks_) { networks_.big.load(is); });
++        threads.clear();
++        threads.ensure_network_replicated();
++    }
++
++    void load_small_network(std::istream& is) {
++        networks.modify_and_replicate(
++          [this, &is](auto& networks_) { networks_.small.load(is); });
++        threads.clear();
++        threads.ensure_network_replicated();
++    }
++
+     // utility functions
+ 
+     void trace_eval() const;
+diff --git a/src/main.cpp b/src/main.cpp
+index 9a7376ef..4aa374f0 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -27,17 +27,22 @@
+ 
+ using namespace Stockfish;
+ 
++UCIEngine* uci_global;
++
+ int main(int argc, char* argv[]) {
+     std::cout << engine_info() << std::endl;
+ 
+     Bitboards::init();
+     Position::init();
+ 
+-    auto uci = std::make_unique<UCIEngine>(argc, argv);
++    uci_global = new UCIEngine(0, nullptr);
+ 
+-    Tune::init(uci->engine_options());
++    Tune::init(uci_global->engine_options());
+ 
+-    uci->loop();
++    uci_global->loop();
++
++    delete uci_global;
++    uci_global = nullptr;
+ 
+     return 0;
+ }
+diff --git a/src/misc.cpp b/src/misc.cpp
+index 3ddae503..17b25c01 100644
+--- a/src/misc.cpp
++++ b/src/misc.cpp
+@@ -480,6 +480,7 @@ bool is_whitespace(std::string_view s) {
+ }
+ 
+ std::string CommandLine::get_binary_directory(std::string argv0) {
++    return "";
+     std::string pathSeparator;
+ 
+ #ifdef _WIN32
+@@ -514,6 +515,7 @@ std::string CommandLine::get_binary_directory(std::string argv0) {
+ }
+ 
+ std::string CommandLine::get_working_directory() {
++    return "";
+     std::string workingDirectory = "";
+     char        buff[40000];
+     char*       cwd = GETCWD(buff, 40000);
+diff --git a/src/nnue/network.cpp b/src/nnue/network.cpp
+index d1f2b14c..460ed89f 100644
+--- a/src/nnue/network.cpp
++++ b/src/nnue/network.cpp
+@@ -192,6 +192,8 @@ Network<Arch, Transformer>::evaluate(const Position&                         pos
+ template<typename Arch, typename Transformer>
+ void Network<Arch, Transformer>::verify(std::string                                  evalfilePath,
+                                         const std::function<void(std::string_view)>& f) const {
++    return;  // Yep
++
+     if (evalfilePath.empty())
+         evalfilePath = evalFile.defaultName;
+ 
+diff --git a/src/nnue/network.h b/src/nnue/network.h
+index cb433718..fc97a09f 100644
+--- a/src/nnue/network.h
++++ b/src/nnue/network.h
+@@ -83,14 +83,15 @@ class Network {
+                                  AccumulatorStack&                       accumulatorStack,
+                                  AccumulatorCaches::Cache<FTDimensions>& cache) const;
+ 
++    std::optional<std::string> load(std::istream&);
++
+    private:
+     void load_user_net(const std::string&, const std::string&);
+     void load_internal();
+ 
+     void initialize();
+ 
+-    bool                       save(std::ostream&, const std::string&, const std::string&) const;
+-    std::optional<std::string> load(std::istream&);
++    bool save(std::ostream&, const std::string&, const std::string&) const;
+ 
+     bool read_header(std::istream&, std::uint32_t*, std::string*) const;
+     bool write_header(std::ostream&, std::uint32_t, const std::string&) const;
+diff --git a/src/shm.h b/src/shm.h
+index d581bf08..8c1f7542 100644
+--- a/src/shm.h
++++ b/src/shm.h
+@@ -36,7 +36,7 @@
+ #include <utility>
+ #include <variant>
+ 
+-#if defined(__linux__) && !defined(__ANDROID__)
++#if defined(__linux__) && !defined(__ANDROID__) && !defined(__EMSCRIPTEN__)
+     #include "shm_linux.h"
+ #endif
+ 
+@@ -137,7 +137,7 @@ inline std::string getExecutablePathHash() {
+         path_length          = len;
+     }
+ 
+-#elif defined(__linux__)
++#elif defined(__linux__) && !defined(__EMSCRIPTEN__)
+     ssize_t len = readlink("/proc/self/exe", executable_path, sizeof(executable_path) - 1);
+     if (len >= 0)
+     {
+@@ -407,7 +407,7 @@ class SharedMemoryBackend {
+     std::string last_error_message;
+ };
+ 
+-#elif defined(__linux__) && !defined(__ANDROID__)
++#elif defined(__linux__) && !defined(__ANDROID__) && !defined(__EMSCRIPTEN__)
+ 
+ template<typename T>
+ class SharedMemoryBackend {
+@@ -539,7 +539,7 @@ struct SystemWideSharedConstant {
+                       discriminator);
+         std::string shm_name = buf;
+ 
+-#if defined(__linux__) && !defined(__ANDROID__)
++#if defined(__linux__) && !defined(__ANDROID__) && !defined(__EMSCRIPTEN__)
+         // POSIX shared memory names must start with a slash
+         shm_name = "/sf_" + createHashString(shm_name);
+ 
+diff --git a/src/timeman.h b/src/timeman.h
+index 08e8da10..917d27ec 100644
+--- a/src/timeman.h
++++ b/src/timeman.h
+@@ -48,7 +48,7 @@ class TimeManagement {
+     TimePoint elapsed(FUNC nodes) const {
+         return useNodesTime ? TimePoint(nodes()) : elapsed_time();
+     }
+-    TimePoint elapsed_time() const { return now() - startTime; };
++    TimePoint elapsed_time() const { return std::max(now() - startTime, TimePoint(1)); };
+ 
+     void clear();
+     void advance_nodes_time(std::int64_t nodes);
+diff --git a/src/uci.cpp b/src/uci.cpp
+index 92700768..622cc593 100644
+--- a/src/uci.cpp
++++ b/src/uci.cpp
+@@ -39,6 +39,8 @@
+ #include "types.h"
+ #include "ucioption.h"
+ 
++std::string js_getline();  // src/dualnet-glue.cpp
++
+ namespace Stockfish {
+ 
+ constexpr auto BenchmarkCommand = "speedtest";
+@@ -65,8 +67,8 @@ void UCIEngine::print_info_string(std::string_view str) {
+ }
+ 
+ UCIEngine::UCIEngine(int argc, char** argv) :
+-    engine(argv[0]),
+-    cli(argc, argv) {
++    engine(),
++    cli(0, nullptr) {
+ 
+     engine.get_options().add_info_listener([](const std::optional<std::string>& str) {
+         if (str.has_value())
+@@ -97,6 +99,8 @@ void UCIEngine::loop() {
+             && !getline(std::cin, cmd))  // Wait for an input or an end-of-file (EOF) indication
+             cmd = "quit";
+ 
++        cmd = js_getline();
++
+         std::istringstream is(cmd);
+ 
+         token.clear();  // Avoid a stale if getline() returns nothing or a blank line
+@@ -175,7 +179,7 @@ void UCIEngine::loop() {
+             sync_cout << "Unknown command: '" << cmd << "'. Type help for more information."
+                       << sync_endl;
+ 
+-    } while (token != "quit" && cli.argc == 1);  // The command-line arguments are one-shot
++    } while (token != "quit");  // The command-line arguments are one-shot
+ }
+ 
+ Search::LimitsType UCIEngine::parse_limits(std::istream& is) {
+diff --git a/src/uci.h b/src/uci.h
+index ebc04fc3..5350eb27 100644
+--- a/src/uci.h
++++ b/src/uci.h
+@@ -54,8 +54,9 @@ class UCIEngine {
+ 
+     auto& engine_options() { return engine.get_options(); }
+ 
+-   private:
+     Engine      engine;
++
++   private:
+     CommandLine cli;
+ 
+     static void print_info_string(std::string_view str);
