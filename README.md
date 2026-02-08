@@ -113,7 +113,7 @@ _The specific file names might change, so check the output of `uci` for the corr
 
 Stockfish 14 without dynamic `import()` in WebWorker.
 
-### [`stockfish.wasm`](https://github.com/lichess-org/stockfish.wasm)
+### [`stockfish.wasm`](https://github.com/lichess-org/stockfish.wasm) and `stockfish-mv.wasm`
 
 [![npmjs.com/package/stockfish.wasm](https://img.shields.io/npm/v/stockfish.wasm)](https://www.npmjs.com/package/stockfish.wasm)
 [![npmjs.com/package/stockfish-mv.wasm](https://img.shields.io/npm/v/stockfish-mv.wasm)](https://www.npmjs.com/package/stockfish-mv.wasm)
