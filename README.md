@@ -1,6 +1,6 @@
 # `@lichess-org/stockfish-web`
 
-![npmjs.com/package/@lichess-org/stockfish-web](https://img.shields.io/npm/v/%40lichess-org%2Fstockfish-web)
+[![npmjs.com/package/@lichess-org/stockfish-web](https://img.shields.io/npm/v/%40lichess-org%2Fstockfish-web)](https://www.npmjs.com/package/@lichess-org/stockfish-web)
 
 WebAssembly builds for Stockfish.
 
@@ -104,3 +104,25 @@ _The specific file names might change, so check the output of `uci` for the corr
 - repo: https://github.com/fairy-stockfish/Fairy-Stockfish
 - commit: [a621470b](https://github.com/fairy-stockfish/Fairy-Stockfish/commit/a621470b91757699f935ba06d5f4bf48a60574b1)
 - nnues: see repo links
+
+## Older repositories kept for compatibility
+
+### [`stockfish-nnue.wasm`](https://github.com/hi-ogawa/Stockfish)
+
+[![npmjs.com/package/stockfish-nnue.wasm](https://img.shields.io/npm/v/stockfish-nnue.wasm)](https://www.npmjs.com/package/stockfish-nnue.wasm)
+
+Stockfish 14 without dynamic `import()` in WebWorker.
+
+### [`stockfish.wasm`](https://github.com/lichess-org/stockfish.wasm)
+
+[![npmjs.com/package/stockfish.wasm](https://img.shields.io/npm/v/stockfish.wasm)](https://www.npmjs.com/package/stockfish.wasm)
+[![npmjs.com/package/stockfish-mv.wasm](https://img.shields.io/npm/v/stockfish-mv.wasm)](https://www.npmjs.com/package/stockfish-mv.wasm)
+
+`SF_classical` (strongest handcoded eval) and multi-variant equivalent.
+No SIMD. No dynamic `import()` in WebWorker.
+
+### [`stockfish.js`](https://github.com/lichess-org/stockfish.js)
+
+[![npmjs.com/package/stockfish.js](https://img.shields.io/npm/v/stockfish.js)](https://www.npmjs.com/package/stockfish.js)
+
+Stockfish 10 in pure JavaScript or WebAssembly without shared memory.
