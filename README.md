@@ -76,12 +76,12 @@ _The specific file names might change, so check the output of `uci` for the corr
 - big nnue: [nn-c288c895ea92.nnue](https://tests.stockfishchess.org/api/nn/nn-c288c895ea92.nnue)
 - small nnue: [nn-37f18f62d772.nnue](https://tests.stockfishchess.org/api/nn/nn-37f18f62d772.nnue)
 
-### sf_dev (Stockfish dev-20260204-fac506bd)
+### sf_dev (Stockfish dev-20260213-77d46ff6)
 
 - repo: https://github.com/official-stockfish/Stockfish
-- commit: [fac506bd](https://github.com/official-stockfish/Stockfish/commit/fac506bdf3f0ed46fd0823ff1ed592824f91aa5a)
-- tag: stockfish-dev-20260204-fac506bd
-- big nnue: [nn-3dd094f3dfcf.nnue](https://tests.stockfishchess.org/api/nn/nn-3dd094f3dfcf.nnue)
+- commit: [77d46ff6](https://github.com/official-stockfish/Stockfish/commit/77d46ff61c3e33f7e9c1ef1f1b48315f23b04e80)
+- tag: stockfish-dev-20260213-77d46ff6
+- big nnue: [nn-7e1657811c6d.nnue](https://tests.stockfishchess.org/api/nn/nn-7e1657811c6d.nnue)
 - small nnue: [nn-37f18f62d772.nnue](https://tests.stockfishchess.org/api/nn/nn-37f18f62d772.nnue)
 
 ### sf_17.1_smallnet (Stockfish 17.1 linrock 256)

@@ -1,9 +1,9 @@
 diff --git a/src/engine.h b/src/engine.h
-index 10c92d75..436830c8 100644
+index 92d6282d..5ca208be 100644
 --- a/src/engine.h
 +++ b/src/engine.h
-@@ -91,6 +91,20 @@ class Engine {
-     void load_small_network(const std::string& file);
+@@ -92,6 +92,20 @@ class Engine {
+     void                                  load_small_network(const std::string& file);
      void save_network(const std::pair<std::optional<std::string>, std::string> files[2]);
  
 +    void load_big_network(std::istream& is) {
@@ -54,10 +54,10 @@ index 9a7376ef..4aa374f0 100644
      return 0;
  }
 diff --git a/src/misc.cpp b/src/misc.cpp
-index 3ddae503..17b25c01 100644
+index 2cb3ce5d..7d7d6b3e 100644
 --- a/src/misc.cpp
 +++ b/src/misc.cpp
-@@ -480,6 +480,7 @@ bool is_whitespace(std::string_view s) {
+@@ -502,6 +502,7 @@ bool is_whitespace(std::string_view s) {
  }
  
  std::string CommandLine::get_binary_directory(std::string argv0) {
@@ -65,7 +65,7 @@ index 3ddae503..17b25c01 100644
      std::string pathSeparator;
  
  #ifdef _WIN32
-@@ -514,6 +515,7 @@ std::string CommandLine::get_binary_directory(std::string argv0) {
+@@ -536,6 +537,7 @@ std::string CommandLine::get_binary_directory(std::string argv0) {
  }
  
  std::string CommandLine::get_working_directory() {

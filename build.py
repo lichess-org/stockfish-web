@@ -44,7 +44,7 @@ targets = {
     },
     "sf_dev": {
         "url": stockfish_repo,
-        "commit": "fac506bdf3f0ed46fd0823ff1ed592824f91aa5a",
+        "commit": "77d46ff61c3e33f7e9c1ef1f1b48315f23b04e80",
         "tags": ["all", "dist"],
     },
 }
