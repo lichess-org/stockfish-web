@@ -72,7 +72,7 @@ ignore_sources = [
 ]
 
 
-def makefile(target, sources, cxx_flags, ld_flags):
+def makefile(target, sources, cxx_flags, ld_flags, relaxed_simd=False):
     all_cxx_flags = " ".join(
         [cxx_flags.strip(), targets[target].get("cxx", "").strip()]
     )
@@ -83,7 +83,7 @@ def makefile(target, sources, cxx_flags, ld_flags):
 CXX = em++
 EXE = {target}
 
-CXX_FLAGS = {all_cxx_flags} -Isrc -pthread -msimd128 -mavx -flto -fno-exceptions \\
+CXX_FLAGS = {all_cxx_flags} -Isrc -pthread -msimd128{" -mrelaxed-simd" if relaxed_simd else ""} -mavx -flto -fno-exceptions \\
 	-DUSE_POPCNT -DUSE_SSE2 -DUSE_SSSE3 -DUSE_SSE41 -DNO_PREFETCH -DNNUE_EMBEDDING_OFF
 
 LD_FLAGS = {ld_flags} \\
@@ -131,6 +131,10 @@ def main():
         "--emcc-version", action="store_true", help="print required emscripten version and exit"
     )
     parser.add_argument(
+        "--relaxed-simd", action="store_true",
+        help="enable WASM relaxed SIMD (requires Chrome 114+/Firefox 122+/Safari 17.4+)",
+    )
+    parser.add_argument(
         "target",
         nargs="*",
         help=f"clean, {', '.join(build_tags + list(targets.keys()))}. default: '%(default)s'",
@@ -168,12 +172,12 @@ def main():
         print("")
     try:
         for target in arg_targets:
-            build_target(target, args.cxx, args.ld)
+            build_target(target, args.cxx, args.ld, args.relaxed_simd)
     except Exception as e:
         print(e)
 
 
-def build_target(target, cxx_flags, ld_flags):  # changes cwd
+def build_target(target, cxx_flags, ld_flags, relaxed_simd=False):  # changes cwd
     target_dir = os.path.join(fishes_dir, target)
     fetch_sources(target)
 
@@ -186,7 +190,7 @@ def build_target(target, cxx_flags, ld_flags):  # changes cwd
     os.chdir(target_dir)
 
     with open("Makefile.tmp", "w") as f:
-        f.write(makefile(target, " ".join(sources), cxx_flags, ld_flags))
+        f.write(makefile(target, " ".join(sources), cxx_flags, ld_flags, relaxed_simd))
 
     subprocess.run(["make", "-f", "Makefile.tmp", "-j"], check=True)
 
