@@ -16,7 +16,7 @@ from typing import Iterable, Literal, NewType
 stockfish_repo = "https://github.com/official-stockfish/Stockfish"
 fairy_stockfish_repo = "https://github.com/fairy-stockfish/Fairy-Stockfish"
 
-emcc_version_min = (4, 0, 18)
+emcc_version_min = (5, 0, 5)
 emcc_version_max = (6, 0, 0)
 
 TargetName = NewType("TargetName", str)
