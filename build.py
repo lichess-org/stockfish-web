@@ -10,7 +10,7 @@ import re
 import sys
 
 from pathlib import Path
-from typing import Iterable, Literal, NewType, TypedDict
+from typing import Iterable, Literal, NewType
 
 
 stockfish_repo = "https://github.com/official-stockfish/Stockfish"
@@ -161,8 +161,8 @@ def main() -> None:
     parser.add_argument(
         "targets",
         nargs="*",
-        choices=["clean"] + list(set(tag for info in targets.values() for tag in info.tags)) + list(targets.keys()),
-        default=[default_target],
+        choices=["clean", *set(tag for info in targets.values() for tag in info.tags), *targets.keys()],
+        default=default_target,
     )
 
     args = parser.parse_args()
@@ -185,9 +185,9 @@ def main() -> None:
         print(f"selected targets: {', '.join(selected_targets)}")
         print(f"cxx flags: {args.cxx_flags}")
         print(f"ld flags: {args.ld_flags}")
-        print("")
 
     for name in selected_targets:
+        print("")
         print(f"# {name}")
         build_target(name, args.cxx_flags, args.ld_flags)
 
@@ -195,7 +195,6 @@ def main() -> None:
 def build_target(name: TargetName, cxx_flags: str, ld_flags: str) -> None:
     fetch_sources(name)
 
-    target = targets[name]
     target_dir = fishes_dir / name
 
     sources = [
@@ -220,7 +219,7 @@ def fetch_sources(name: TargetName) -> None:
     try:
         checkout_dir.mkdir(parents=True, exist_ok=False)
     except FileExistsError:
-        print(f"skipping clone/patch for {name} (already exists)")
+        print(f"skipping clone and patch for {name} (already exists)")
         return
 
     env = os.environ | {
