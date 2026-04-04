@@ -15,24 +15,24 @@ Check out https://github.com/nmrugg/stockfish.js for a simpler browser Stockfish
 ./build.py all clean
 ```
 
-Use `--cxx` to override the default emcc flags which are `-O3 -DNDEBUG --closure=1`.
+Use `--cxx-flags` to override the default emcc flags which are `-O3 -DNDEBUG --closure=1`.
 
-Use `--ld` to override default linker flags (`--ld='-sENVIRONMENT=node'` to target node).
+Use `--ld-flags` to override default linker flags (`--ld-flags='-sENVIRONMENT=node'` to target node).
 
-Check `./build.py --help` for the latest targets
+Check `./build.py --help` for all available targets.
 
 To avoid installing or changing your emscripten version, use `./build-with-docker.sh` or `./build-with-podman.sh`:
 
 ```
 # Example: Docker clean and make all targets for node as debug with SAFE_HEAP
-./build-with-docker.sh --cxx='-O0 -g3 -sSAFE_HEAP' --ld='-sENVIRONMENT=node' all clean
+./build-with-docker.sh --cxx-flags='-O0 -g3 -sSAFE_HEAP' --ld-flags='-sENVIRONMENT=node' all clean
 
-# Example: clean and make dist targets for web with a preallocated pthread pool size of 8
-./build.py --ld='-sENVIRONMENT=web,worker -sPTHREAD_POOL_SIZE=8' clean dist
+# Example: Clean and make dist targets for web with a preallocated pthread pool size of 8
+./build.py --ld-flags='-sENVIRONMENT=web,worker -sPTHREAD_POOL_SIZE=8' clean dist
 ```
 
 `./build.py` downloads sources to the `./fishes` folder then applies diffs from the `./patches` folder.
-Edit the Stockfish sources within `./fishes`. Contribute your edits via patch file
+Edit the Stockfish sources within `./fishes`. Contribute your edits via patch file.
 
 ```
 # Example: Update `sf_17.1.patch` with your source changes:
@@ -43,14 +43,14 @@ git diff > ../../patches/sf_17.1.patch
 ## Run locally on node
 
 ```
-./build.py --ld='-sENVIRONMENT=node'
+./build.py --ld-flags='-sENVIRONMENT=node'
 node ./src/wasm-cli.js ./sf_18.js
 uci
 ```
 
-Check the output of `uci` for the correct nnue names and download ones you don't have from https://tests.stockfishchess.org/nns
+Check the output of `uci` for the correct nnue names and download ones you don't have from https://tests.stockfishchess.org/nns.
 
-Now you'll have to load the nnues. (see `./src/wasm-cli.js`).
+Now you'll have to load the nnues (see `./src/wasm-cli.js`).
 
 ```
 big ./nn-c288c895ea92.nnue
