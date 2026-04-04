@@ -16,7 +16,7 @@ from typing import Iterable, Literal, NewType
 stockfish_repo = "https://github.com/official-stockfish/Stockfish"
 fairy_stockfish_repo = "https://github.com/fairy-stockfish/Fairy-Stockfish"
 
-emcc_version_min = (4, 0, 18)
+emcc_version_min = (5, 0, 5)
 emcc_version_max = (6, 0, 0)
 
 TargetName = NewType("TargetName", str)
@@ -87,6 +87,13 @@ targets: dict[TargetName, Target] = {
         tags=["all", "dist"],
     ),
 }
+
+relaxed_simd_cxx_flags = ["-mrelaxed-simd"]
+targets[TargetName("sf_17.1_smallnet_relaxed-simd")] = dataclasses.replace(targets[TargetName("sf_17.1_smallnet")], cxx_flags=relaxed_simd_cxx_flags)
+targets[TargetName("sf_17.1_relaxed-simd")] = dataclasses.replace(targets[TargetName("sf_17.1")], cxx_flags=relaxed_simd_cxx_flags)
+targets[TargetName("sf_18_smallnet_relaxed-simd")] = dataclasses.replace(targets[TargetName("sf_18_smallnet")], cxx_flags=relaxed_simd_cxx_flags)
+targets[TargetName("sf_18_relaxed-simd")] = dataclasses.replace(targets[TargetName("sf_18")], cxx_flags=relaxed_simd_cxx_flags)
+targets[TargetName("sf_dev_relaxed-simd")] = dataclasses.replace(targets[TargetName("sf_dev")], cxx_flags=relaxed_simd_cxx_flags)
 
 default_target = TargetName("sf_18_smallnet")
 

@@ -41,13 +41,13 @@ index 9a7376ef..4aa374f0 100644
  
 -    auto uci = std::make_unique<UCIEngine>(argc, argv);
 +    uci_global = new UCIEngine(0, nullptr);
- 
--    Tune::init(uci->engine_options());
++
 +    Tune::init(uci_global->engine_options());
  
--    uci->loop();
+-    Tune::init(uci->engine_options());
 +    uci_global->loop();
-+
+ 
+-    uci->loop();
 +    delete uci_global;
 +    uci_global = nullptr;
  
@@ -108,6 +108,38 @@ index cb433718..fc97a09f 100644
  
      bool read_header(std::istream&, std::uint32_t*, std::string*) const;
      bool write_header(std::ostream&, std::uint32_t, const std::string&) const;
+diff --git a/src/nnue/simd.h b/src/nnue/simd.h
+index 25891163..630ca45f 100644
+--- a/src/nnue/simd.h
++++ b/src/nnue/simd.h
+@@ -35,6 +35,7 @@
+     #include <arm_neon.h>
+ #endif
+ 
++
+ #include "../types.h"
+ #include "nnue_common.h"
+ 
+@@ -333,9 +334,19 @@ fused(const typename VecWrapper::type& in, const T& operand, const Ts&... operan
+ 
+ [[maybe_unused]] static void m128_add_dpbusd_epi32(__m128i& acc, __m128i a, __m128i b) {
+ 
++#if defined(__wasm_relaxed_simd__)
++    // WASM relaxed SIMD fused dot product: 1 instruction instead of 3.
++    // Operand b (weights) can exceed the i7 range [-64,63]; the spec
++    // treats out-of-range values as implementation-defined. Current
++    // x86/ARM runtimes lower this to full-range native dot-product
++    // instructions, matching the SSSE3 path below.
++    acc = (__m128i)wasm_i32x4_relaxed_dot_i8x16_i7x16_add(
++        (v128_t)a, (v128_t)b, (v128_t)acc);
++#else
+     __m128i product0 = _mm_maddubs_epi16(a, b);
+     product0         = _mm_madd_epi16(product0, _mm_set1_epi16(1));
+     acc              = _mm_add_epi32(acc, product0);
++#endif
+ }
+ 
+ #endif
 diff --git a/src/shm.h b/src/shm.h
 index e1256b26..176d1988 100644
 --- a/src/shm.h
