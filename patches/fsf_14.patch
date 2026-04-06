@@ -17,7 +17,7 @@ index 396d5ff6..0500aa58 100644
    void NNUE::verify() {
  
 +    return;
-+    
++
      string eval_file = string(Options["EvalFile"]);
  
      if (useNNUE && eval_file.find(eval_file_loaded) == string::npos)
