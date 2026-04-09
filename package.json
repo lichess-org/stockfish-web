@@ -14,6 +14,12 @@
     "sf_18.wasm",
     "sf_dev.js",
     "sf_dev.wasm",
+    "sf_18_smallnet_relaxed-simd.js",
+    "sf_18_smallnet_relaxed-simd.wasm",
+    "sf_18_relaxed-simd.js",
+    "sf_18_relaxed-simd.wasm",
+    "sf_dev_relaxed-simd.js",
+    "sf_dev_relaxed-simd.wasm",
     "fsf_14.js",
     "fsf_14.wasm",
     "stockfishWeb.d.ts"
