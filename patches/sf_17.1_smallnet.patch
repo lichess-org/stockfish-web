@@ -184,7 +184,7 @@ index c5ac45f5..77fbf4a6 100644
      char        buff[40000];
      char*       cwd = GETCWD(buff, 40000);
 diff --git a/src/nnue/layers/simd.h b/src/nnue/layers/simd.h
-index 70ca68a0..8f50e7cf 100644
+index 70ca68a0..d0e9fe46 100644
 --- a/src/nnue/layers/simd.h
 +++ b/src/nnue/layers/simd.h
 @@ -35,6 +35,7 @@
@@ -195,19 +195,19 @@ index 70ca68a0..8f50e7cf 100644
  namespace Stockfish::Simd {
  
  #if defined(USE_AVX512)
-@@ -88,9 +89,18 @@ namespace Stockfish::Simd {
+@@ -86,11 +87,15 @@ namespace Stockfish::Simd {
+     return _mm_cvtsi128_si32(sum) + bias;
+ }
  
- [[maybe_unused]] static void m128_add_dpbusd_epi32(__m128i& acc, __m128i a, __m128i b) {
- 
+-[[maybe_unused]] static void m128_add_dpbusd_epi32(__m128i& acc, __m128i a, __m128i b) {
+-
+-    __m128i product0 = _mm_maddubs_epi16(a, b);
++[[maybe_unused]] static void m128_add_dpbusd_epi32(__m128i& acc, __m128i activations_u7, __m128i weights_i8) {
 +#if defined(__wasm_relaxed_simd__)
-+    // WASM relaxed SIMD: 1 fused dot-product instruction instead of 3.
-+    // Operands are (weights, activations) not (activations, weights):
-+    // the spec's second operand has implementation-defined signedness
-+    // when its high bit is set (unsigned on x86, signed on ARM64).
 +    acc = (__m128i)wasm_i32x4_relaxed_dot_i8x16_i7x16_add(
-+        (v128_t)b, (v128_t)a, (v128_t)acc);
++        (v128_t)weights_i8, (v128_t)activations_u7, (v128_t)acc);
 +#else
-     __m128i product0 = _mm_maddubs_epi16(a, b);
++    __m128i product0 = _mm_maddubs_epi16(activations_u7, weights_i8);
      product0         = _mm_madd_epi16(product0, _mm_set1_epi16(1));
      acc              = _mm_add_epi32(acc, product0);
 +#endif
