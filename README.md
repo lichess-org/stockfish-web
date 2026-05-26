@@ -35,9 +35,9 @@ To avoid installing or changing your emscripten version, use `./build-with-docke
 Edit the Stockfish sources within `./fishes`. Contribute your edits via patch file.
 
 ```
-# Example: Update `sf_17.1.patch` with your source changes:
-cd fishes/sf_17.1
-git diff > ../../patches/sf_17.1.patch
+# Example: Update `sf_18.patch` with your source changes:
+cd fishes/sf_18
+git diff > ../../patches/sf_18.patch
 ```
 
 ## Run locally on node
@@ -83,21 +83,6 @@ _The specific file names might change, so check the output of `uci` for the corr
 - tag: stockfish-dev-20260213-77d46ff6
 - big nnue: [nn-7e1657811c6d.nnue](https://tests.stockfishchess.org/api/nn/nn-7e1657811c6d.nnue)
 - small nnue: [nn-37f18f62d772.nnue](https://tests.stockfishchess.org/api/nn/nn-37f18f62d772.nnue)
-
-### sf_17.1_smallnet (Stockfish 17.1 linrock 256)
-
-- repo: https://github.com/official-stockfish/Stockfish
-- commit: [03e2748](https://github.com/official-stockfish/Stockfish/commit/03e27488f3d21d8ff4dbf3065603afa21dbd0ef3)
-- tag: sf_17.1
-- nnue: [nn-9067e33176e8.nnue](https://tests.stockfishchess.org/api/nn/nn-9067e33176e8.nnue)
-
-### sf_17.1 (Official Stockfish 17.1 release)
-
-- repo: https://github.com/official-stockfish/Stockfish
-- commit: [03e27488](https://github.com/official-stockfish/Stockfish/commit/03e27488f3d21d8ff4dbf3065603afa21dbd0ef3)
-- tag: sf_17.1
-- big nnue: [nn-1c0000000000.nnue](https://tests.stockfishchess.org/api/nn/nn-1c0000000000.nnue)
-- small nnue: [nn-37f18f62d772.nnue](//tests.stockfishchess.org/api/nn/nn-37f18f62d772.nnue)
 
 ### fsf_14 (Fairy-Stockfish 14)
 

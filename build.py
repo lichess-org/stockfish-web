@@ -56,18 +56,6 @@ targets: dict[TargetName, Target] = {
         patch="fsf_14.patch",
         tags=["all", "dist"],
     ),
-    TargetName("sf_17.1_smallnet"): Target(
-        repo=stockfish_repo,
-        commit="03e27488f3d21d8ff4dbf3065603afa21dbd0ef3",
-        patch="sf_17.1_smallnet.patch",
-        tags=["all", "legacy"],
-    ),
-    TargetName("sf_17.1"): Target(
-        repo=stockfish_repo,
-        commit="03e27488f3d21d8ff4dbf3065603afa21dbd0ef3",
-        patch="sf_17.1.patch",
-        tags=["all", "legacy"],
-    ),
     TargetName("sf_18_smallnet"): Target(
         repo=stockfish_repo,
         commit="cb3d4ee9b47d0c5aae855b12379378ea1439675c",
@@ -89,8 +77,6 @@ targets: dict[TargetName, Target] = {
 }
 
 relaxed_simd_cxx_flags = ["-mrelaxed-simd"]
-targets[TargetName("sf_17.1_smallnet_relaxed-simd")] = dataclasses.replace(targets[TargetName("sf_17.1_smallnet")], cxx_flags=relaxed_simd_cxx_flags)
-targets[TargetName("sf_17.1_relaxed-simd")] = dataclasses.replace(targets[TargetName("sf_17.1")], cxx_flags=relaxed_simd_cxx_flags)
 targets[TargetName("sf_18_smallnet_relaxed-simd")] = dataclasses.replace(targets[TargetName("sf_18_smallnet")], cxx_flags=relaxed_simd_cxx_flags)
 targets[TargetName("sf_18_relaxed-simd")] = dataclasses.replace(targets[TargetName("sf_18")], cxx_flags=relaxed_simd_cxx_flags)
 targets[TargetName("sf_dev_relaxed-simd")] = dataclasses.replace(targets[TargetName("sf_dev")], cxx_flags=relaxed_simd_cxx_flags)

@@ -139,6 +139,28 @@ index 25891163..9ace7370 100644
  }
  
  #endif
+diff --git a/src/search.cpp b/src/search.cpp
+index 40ba2eff..befaa2a8 100644
+--- a/src/search.cpp
++++ b/src/search.cpp
+@@ -588,8 +588,15 @@ void Search::Worker::clear() {
+     captureHistory.fill(-689);
+ 
+     // Each thread is responsible for clearing their part of shared history
+-    sharedHistory.correctionHistory.clear_range(0, numaThreadIdx, numaTotal);
+-    sharedHistory.pawnHistory.clear_range(-1238, numaThreadIdx, numaTotal);
++    auto&        correction = sharedHistory.correctionHistory;
++    const size_t cStart     = numaThreadIdx * correction.get_size() / numaTotal;
++    const size_t cEnd       = (numaThreadIdx + 1) * correction.get_size() / numaTotal;
++    __builtin_memset(&correction[cStart], 0, (cEnd - cStart) * sizeof(correction[0]));
++
++    auto&        pawn   = sharedHistory.pawnHistory;
++    const size_t pStart = numaThreadIdx * pawn.get_size() / numaTotal;
++    const size_t pEnd   = (numaThreadIdx + 1) * pawn.get_size() / numaTotal;
++    std::fill_n(reinterpret_cast<int16_t*>(&pawn[pStart]), (pEnd - pStart) * PIECE_NB * SQUARE_NB, -1238);
+ 
+     ttMoveHistory = 0;
+ 
 diff --git a/src/shm.h b/src/shm.h
 index e1256b26..176d1988 100644
 --- a/src/shm.h

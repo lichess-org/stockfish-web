@@ -7,7 +7,7 @@
 #include "uci.h"
 #include "nnue/nnue_architecture.h"
 
-#if __has_include("nnue/evaluate_nnue.h") // sf-16
+#if __has_include("nnue/evaluate_nnue.h") // fsf
 # include "nnue/evaluate_nnue.h"
 # define EvalFileDefaultNameSmall EvalFileDefaultName
 # define EvalFileDefaultNameBig EvalFileDefaultName
@@ -18,7 +18,7 @@
     else std::cerr << "BAD_NNUE" << std::endl;
     return "setoption name Use NNUE value false";
   }
-#else // sf-17
+#else // sf-18+
   # ifndef EvalFileDefaultNameSmall // single net
   # define EvalFileDefaultNameSmall EvalFileDefaultNameBig
   # endif
@@ -32,12 +32,6 @@
   }
 
   namespace Stockfish::Tablebases {
-    // Stockfish 17
-    Config rank_root_moves(const OptionsMap& o, Position& p, Search::RootMoves& rM, bool rankDTZ) {
-      for (auto& m: rM) m.tbRank = 0;
-      return Config();
-    }
-    // Stockfish 18+
     Config rank_root_moves(const OptionsMap& o, Position& p, Search::RootMoves& rM, bool rankDTZ, const std::function<bool()>& timeAbort) {
       for (auto& m: rM) m.tbRank = 0;
       return Config();
