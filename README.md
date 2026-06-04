@@ -42,22 +42,13 @@ git diff > ../../patches/sf_18.patch
 
 ## Run locally on node
 
+Download the required nnues from the list below. Then:
+
 ```
 ./build.py --ld-flags='-sENVIRONMENT=node'
 node ./src/wasm-cli.js ./sf_18.js
 uci
 ```
-
-Check the output of `uci` for the correct nnue names and download ones you don't have from https://tests.stockfishchess.org/nns.
-
-Now you'll have to load the nnues (see `./src/wasm-cli.js`).
-
-```
-big ./nn-c288c895ea92.nnue
-small ./nn-37f18f62d772.nnue
-```
-
-_The specific file names might change, so check the output of `uci` for the correct names._
 
 ## Sources
 

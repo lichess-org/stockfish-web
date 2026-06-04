@@ -11,7 +11,7 @@ if (!Module['listen']) Module['listen'] = data => console.log(data);
 if (!Module['onError']) Module['onError'] = data => console.error(data);
 
 /** @private, @param {number=} index */
-Module['getRecommendedNnue'] = (index = 0) => UTF8ToString(_getRecommendedNnue(index));
+Module['getRecommendedNnue'] = (index = 0) => UTF8ToString(_getRecommendedNnue(index)) || undefined;
 
 /** @private, @param {Uint8Array} buf, @param {number=} index */
 Module['setNnueBuffer'] = function (buf, index = 0) {

@@ -6,6 +6,13 @@ let history = [],
   index = 0;
 
 const sf = await createStockfish.default();
+
+for (let index = 0; ; index++) {
+  const nnueFilename = sf.getRecommendedNnue(index);
+  if (!nnueFilename) break;
+  sf.setNnueBuffer(fs.readFileSync(nnueFilename), index);
+}
+
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,

@@ -6,7 +6,7 @@ declare module "@lichess-org/stockfish-web" {
 
     setNnueBuffer(data: Uint8Array, index?: number): void; // load nnue as buffer
 
-    getRecommendedNnue(index?: number): string; // returns a bare filename
+    getRecommendedNnue(index?: number): string | undefined; // returns a bare filename
 
     listen: (data: string) => void; // attach listener here
 

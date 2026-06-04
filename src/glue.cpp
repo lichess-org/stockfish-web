@@ -9,8 +9,6 @@
 
 #if __has_include("nnue/evaluate_nnue.h") // fsf
 # include "nnue/evaluate_nnue.h"
-# define EvalFileDefaultNameSmall EvalFileDefaultName
-# define EvalFileDefaultNameBig EvalFileDefaultName
   const std::string load_nnue_cmd(Command& cmd) {
     std::istream in(&cmd);
     if (Stockfish::Eval::NNUE::load_eval("", in))
@@ -19,9 +17,6 @@
     return "setoption name Use NNUE value false";
   }
 #else // sf-18+
-  # ifndef EvalFileDefaultNameSmall // single net
-  # define EvalFileDefaultNameSmall EvalFileDefaultNameBig
-  # endif
   extern Stockfish::UCIEngine* uci_global;
 
   const std::string load_nnue_cmd(Command& cmd) {
@@ -49,7 +44,21 @@ extern "C" {
   }
 
   EMSCRIPTEN_KEEPALIVE const char* getRecommendedNnue(int index) {
-    return index == 1 ? EvalFileDefaultNameSmall : EvalFileDefaultNameBig;
+    switch (index) {
+    case 0:
+#if defined(EvalFileDefaultName)
+      return EvalFileDefaultName;
+#elif defined(EvalFileDefaultNameBig)
+      return EvalFileDefaultNameBig;
+#endif
+      break;
+    case 1:
+#if defined(EvalFileDefaultNameSmall)
+      return EvalFileDefaultNameSmall;
+#endif
+      break;
+    }
+    return "";
   }
 }
 
