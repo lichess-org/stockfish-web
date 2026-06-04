@@ -84,7 +84,6 @@ targets[TargetName("sf_dev_relaxed-simd")] = dataclasses.replace(targets[TargetN
 default_target = TargetName("sf_18_smallnet")
 
 ignore_sources = [
-    os.path.join("syzygy", "tbprobe.cpp"),
     "pyffish.cpp",
     "ffishjs.cpp",
 ]
@@ -103,7 +102,9 @@ CXX = em++
 EXE = {name}
 
 CXX_FLAGS = {all_cxx_flags} -Isrc -pthread -msimd128 -mavx -flto -fno-exceptions \\
-	-DUSE_POPCNT -DUSE_SSE2 -DUSE_SSSE3 -DUSE_SSE41 -DNO_PREFETCH -DNNUE_EMBEDDING_OFF
+	-DUSE_POPCNT -DUSE_SSE2 -DUSE_SSSE3 -DUSE_SSE41 -DNO_PREFETCH \\
+	-DNNUE_EMBEDDING_OFF \\
+	-DNO_TABLEBASES
 
 LD_FLAGS = {ld_flags} \\
 	--pre-js=../../src/initModule.js -sEXIT_RUNTIME -sEXPORT_ES6 -sEXPORT_NAME={mod_name(name)} \\

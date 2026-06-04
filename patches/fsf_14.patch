@@ -22,7 +22,7 @@ index 396d5ff6..fc0c285d 100644
  
      if (useNNUE && eval_file.find(eval_file_loaded) == string::npos)
 diff --git a/src/main.cpp b/src/main.cpp
-index afad7f13..f6eb57ef 100644
+index afad7f13..87763a2d 100644
 --- a/src/main.cpp
 +++ b/src/main.cpp
 @@ -41,7 +41,6 @@ int main(int argc, char* argv[]) {
@@ -33,10 +33,28 @@ index afad7f13..f6eb57ef 100644
    UCI::init(Options);
    Tune::init();
    PSQT::init(variants.find(Options["UCI_Variant"])->second);
-@@ -61,3 +60,19 @@ int main(int argc, char* argv[]) {
-   delete XBoard::stateMachine;
-   return 0;
- }
+diff --git a/src/search.cpp b/src/search.cpp
+index 77686ed0..b2db2bdd 100644
+--- a/src/search.cpp
++++ b/src/search.cpp
+@@ -1987,7 +1987,7 @@ void MainThread::check_time() {
+ string UCI::pv(const Position& pos, Depth depth, Value alpha, Value beta) {
+ 
+   std::stringstream ss;
+-  TimePoint elapsed = Time.elapsed() + 1;
++  TimePoint elapsed = std::max(Time.elapsed() + 1, TimePoint(1));
+   const RootMoves& rootMoves = pos.this_thread()->rootMoves;
+   size_t pvIdx = pos.this_thread()->pvIdx;
+   size_t multiPV = std::min((size_t)Options["MultiPV"], rootMoves.size());
+diff --git a/src/syzygy/tbprobe.cpp b/src/syzygy/tbprobe.cpp
+index 36b2fd0a..287f0ada 100644
+--- a/src/syzygy/tbprobe.cpp
++++ b/src/syzygy/tbprobe.cpp
+@@ -37,6 +37,26 @@
+ 
+ #include "tbprobe.h"
+ 
++#ifdef NO_TABLEBASES
 +
 +namespace Stockfish::Tablebases {
 +  int MaxCardinality = 0;
@@ -53,19 +71,18 @@ index afad7f13..f6eb57ef 100644
 +  bool root_probe(Position& p, Search::RootMoves& rM) { return false; }
 +  bool root_probe_wdl(Position& p, Search::RootMoves& rM) { return false; }
 +}
-diff --git a/src/search.cpp b/src/search.cpp
-index 77686ed0..b2db2bdd 100644
---- a/src/search.cpp
-+++ b/src/search.cpp
-@@ -1987,7 +1987,7 @@ void MainThread::check_time() {
- string UCI::pv(const Position& pos, Depth depth, Value alpha, Value beta) {
++
++#else
++
+ #ifndef _WIN32
+ #include <fcntl.h>
+ #include <unistd.h>
+@@ -1634,3 +1654,5 @@ bool Tablebases::root_probe_wdl(Position& pos, Search::RootMoves& rootMoves) {
+ }
  
-   std::stringstream ss;
--  TimePoint elapsed = Time.elapsed() + 1;
-+  TimePoint elapsed = std::max(Time.elapsed() + 1, TimePoint(1));
-   const RootMoves& rootMoves = pos.this_thread()->rootMoves;
-   size_t pvIdx = pos.this_thread()->pvIdx;
-   size_t multiPV = std::min((size_t)Options["MultiPV"], rootMoves.size());
+ } // namespace Stockfish
++
++#endif // NO_TABLEBASES
 diff --git a/src/tt.cpp b/src/tt.cpp
 index 5982d937..062bdf62 100644
 --- a/src/tt.cpp
