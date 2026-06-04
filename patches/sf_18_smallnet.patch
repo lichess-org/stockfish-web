@@ -134,10 +134,10 @@ index b4f54a38..887f6c4e 100644
  namespace NNUE {
  struct Networks;
 diff --git a/src/main.cpp b/src/main.cpp
-index 9a7376ef..4aa374f0 100644
+index 9a7376ef..e4b6d619 100644
 --- a/src/main.cpp
 +++ b/src/main.cpp
-@@ -27,17 +27,22 @@
+@@ -27,17 +27,43 @@
  
  using namespace Stockfish;
  
@@ -157,11 +157,32 @@ index 9a7376ef..4aa374f0 100644
  
 -    uci->loop();
 +    uci_global->loop();
-+
+ 
 +    delete uci_global;
 +    uci_global = nullptr;
- 
++
++    return 0;
++}
++
++namespace Stockfish::Tablebases {
++  int MaxCardinality = 0;
++  void init(const std::string& paths) {}
++  WDLScore probe_wdl(Position& p, ProbeState* r) {
++    *r = ProbeState::FAIL;
++    return WDLDraw;
++  }
++  int probe_dtz(Position& p, ProbeState* r) {
++    *r = ProbeState::FAIL;
      return 0;
++  }
++
++  bool root_probe(Position& p, Search::RootMoves& rM) { return false; }
++  bool root_probe_wdl(Position& p, Search::RootMoves& rM) { return false; }
++
++  Config rank_root_moves(const OptionsMap& o, Position& p, Search::RootMoves& rM, bool rankDTZ, const std::function<bool()>& timeAbort) {
++    for (auto& m: rM) m.tbRank = 0;
++    return Config();
++  }
  }
 diff --git a/src/misc.cpp b/src/misc.cpp
 index 5f8f31a9..c00d4a32 100644
@@ -448,7 +469,7 @@ index 25891163..9ace7370 100644
  
  #endif
 diff --git a/src/search.cpp b/src/search.cpp
-index 40ba2eff..befaa2a8 100644
+index 40ba2eff..361dc0d8 100644
 --- a/src/search.cpp
 +++ b/src/search.cpp
 @@ -588,8 +588,15 @@ void Search::Worker::clear() {

@@ -24,10 +24,10 @@ index 92d6282d..5ca208be 100644
  
      void trace_eval() const;
 diff --git a/src/main.cpp b/src/main.cpp
-index 9a7376ef..4aa374f0 100644
+index 9a7376ef..e4b6d619 100644
 --- a/src/main.cpp
 +++ b/src/main.cpp
-@@ -27,17 +27,22 @@
+@@ -27,17 +27,43 @@
  
  using namespace Stockfish;
  
@@ -47,11 +47,32 @@ index 9a7376ef..4aa374f0 100644
  
 -    uci->loop();
 +    uci_global->loop();
-+
+ 
 +    delete uci_global;
 +    uci_global = nullptr;
- 
++
++    return 0;
++}
++
++namespace Stockfish::Tablebases {
++  int MaxCardinality = 0;
++  void init(const std::string& paths) {}
++  WDLScore probe_wdl(Position& p, ProbeState* r) {
++    *r = ProbeState::FAIL;
++    return WDLDraw;
++  }
++  int probe_dtz(Position& p, ProbeState* r) {
++    *r = ProbeState::FAIL;
      return 0;
++  }
++
++  bool root_probe(Position& p, Search::RootMoves& rM) { return false; }
++  bool root_probe_wdl(Position& p, Search::RootMoves& rM) { return false; }
++
++  Config rank_root_moves(const OptionsMap& o, Position& p, Search::RootMoves& rM, bool rankDTZ, const std::function<bool()>& timeAbort) {
++    for (auto& m: rM) m.tbRank = 0;
++    return Config();
++  }
  }
 diff --git a/src/misc.cpp b/src/misc.cpp
 index 2cb3ce5d..7d7d6b3e 100644
@@ -140,7 +161,7 @@ index 601792c1..2efc7a6a 100644
  
  #endif
 diff --git a/src/search.cpp b/src/search.cpp
-index cc3c06d7..5e05b232 100644
+index cc3c06d7..96ec7d61 100644
 --- a/src/search.cpp
 +++ b/src/search.cpp
 @@ -586,8 +586,15 @@ void Search::Worker::clear() {

@@ -1,5 +1,5 @@
 diff --git a/src/evaluate.cpp b/src/evaluate.cpp
-index 396d5ff6..0500aa58 100644
+index 396d5ff6..fc0c285d 100644
 --- a/src/evaluate.cpp
 +++ b/src/evaluate.cpp
 @@ -77,6 +77,9 @@ namespace Eval {
@@ -22,7 +22,7 @@ index 396d5ff6..0500aa58 100644
  
      if (useNNUE && eval_file.find(eval_file_loaded) == string::npos)
 diff --git a/src/main.cpp b/src/main.cpp
-index afad7f13..87763a2d 100644
+index afad7f13..f6eb57ef 100644
 --- a/src/main.cpp
 +++ b/src/main.cpp
 @@ -41,7 +41,6 @@ int main(int argc, char* argv[]) {
@@ -33,6 +33,26 @@ index afad7f13..87763a2d 100644
    UCI::init(Options);
    Tune::init();
    PSQT::init(variants.find(Options["UCI_Variant"])->second);
+@@ -61,3 +60,19 @@ int main(int argc, char* argv[]) {
+   delete XBoard::stateMachine;
+   return 0;
+ }
++
++namespace Stockfish::Tablebases {
++  int MaxCardinality = 0;
++  void init(const std::string& paths) {}
++  WDLScore probe_wdl(Position& p, ProbeState* r) {
++    *r = ProbeState::FAIL;
++    return WDLDraw;
++  }
++  int probe_dtz(Position& p, ProbeState* r) {
++    *r = ProbeState::FAIL;
++    return 0;
++  }
++
++  bool root_probe(Position& p, Search::RootMoves& rM) { return false; }
++  bool root_probe_wdl(Position& p, Search::RootMoves& rM) { return false; }
++}
 diff --git a/src/search.cpp b/src/search.cpp
 index 77686ed0..b2db2bdd 100644
 --- a/src/search.cpp
