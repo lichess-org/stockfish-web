@@ -1,21 +1,14 @@
 diff --git a/src/engine.h b/src/engine.h
-index 92d6282d..5ca208be 100644
+index f5d09d4e..01a69863 100644
 --- a/src/engine.h
 +++ b/src/engine.h
-@@ -92,6 +92,20 @@ class Engine {
-     void                                  load_small_network(const std::string& file);
-     void save_network(const std::pair<std::optional<std::string>, std::string> files[2]);
+@@ -92,6 +92,13 @@ class Engine {
+     void                                 load_network(const std::string& file);
+     void save_network(std::pair<std::optional<std::string>, std::string> file);
  
 +    void load_big_network(std::istream& is) {
-+        networks.modify_and_replicate(
-+          [this, &is](auto& networks_) { networks_.big.load(is); });
-+        threads.clear();
-+        threads.ensure_network_replicated();
-+    }
-+
-+    void load_small_network(std::istream& is) {
-+        networks.modify_and_replicate(
-+          [this, &is](auto& networks_) { networks_.small.load(is); });
++        network.modify_and_replicate(
++          [this, &is](Eval::NNUE::Network& network_) { network_.load(is); });
 +        threads.clear();
 +        threads.ensure_network_replicated();
 +    }
@@ -24,19 +17,20 @@ index 92d6282d..5ca208be 100644
  
      void trace_eval() const;
 diff --git a/src/main.cpp b/src/main.cpp
-index 9a7376ef..e4b6d619 100644
+index c386c418..ea9bf686 100644
 --- a/src/main.cpp
 +++ b/src/main.cpp
-@@ -27,17 +27,43 @@
+@@ -28,6 +28,8 @@
  
  using namespace Stockfish;
  
 +UCIEngine* uci_global;
 +
- int main(int argc, char* argv[]) {
-     std::cout << engine_info() << std::endl;
+ #ifdef UNIVERSAL_BINARY
+ namespace Stockfish {
  
-     Bitboards::init();
+@@ -43,11 +45,14 @@ int main(int argc, char* argv[]) {
+     Attacks::init();
      Position::init();
  
 -    auto uci = std::make_unique<UCIEngine>(argc, argv);
@@ -47,38 +41,17 @@ index 9a7376ef..e4b6d619 100644
  
 -    uci->loop();
 +    uci_global->loop();
- 
++
 +    delete uci_global;
 +    uci_global = nullptr;
-+
-+    return 0;
-+}
-+
-+namespace Stockfish::Tablebases {
-+  int MaxCardinality = 0;
-+  void init(const std::string& paths) {}
-+  WDLScore probe_wdl(Position& p, ProbeState* r) {
-+    *r = ProbeState::FAIL;
-+    return WDLDraw;
-+  }
-+  int probe_dtz(Position& p, ProbeState* r) {
-+    *r = ProbeState::FAIL;
+ 
      return 0;
-+  }
-+
-+  bool root_probe(Position& p, Search::RootMoves& rM) { return false; }
-+  bool root_probe_wdl(Position& p, Search::RootMoves& rM) { return false; }
-+
-+  Config rank_root_moves(const OptionsMap& o, Position& p, Search::RootMoves& rM, bool rankDTZ, const std::function<bool()>& timeAbort) {
-+    for (auto& m: rM) m.tbRank = 0;
-+    return Config();
-+  }
  }
 diff --git a/src/misc.cpp b/src/misc.cpp
-index 2cb3ce5d..7d7d6b3e 100644
+index d144a26f..14bc016c 100644
 --- a/src/misc.cpp
 +++ b/src/misc.cpp
-@@ -502,6 +502,7 @@ bool is_whitespace(std::string_view s) {
+@@ -508,6 +508,7 @@ bool is_whitespace(std::string_view s) {
  }
  
  std::string CommandLine::get_binary_directory(std::string argv0) {
@@ -86,7 +59,7 @@ index 2cb3ce5d..7d7d6b3e 100644
      std::string pathSeparator;
  
  #ifdef _WIN32
-@@ -536,6 +537,7 @@ std::string CommandLine::get_binary_directory(std::string argv0) {
+@@ -542,6 +543,7 @@ std::string CommandLine::get_binary_directory(std::string argv0) {
  }
  
  std::string CommandLine::get_working_directory() {
@@ -95,25 +68,26 @@ index 2cb3ce5d..7d7d6b3e 100644
      char        buff[40000];
      char*       cwd = GETCWD(buff, 40000);
 diff --git a/src/nnue/network.cpp b/src/nnue/network.cpp
-index d1f2b14c..460ed89f 100644
+index 382f4f44..94268d4f 100644
 --- a/src/nnue/network.cpp
 +++ b/src/nnue/network.cpp
-@@ -192,6 +192,8 @@ Network<Arch, Transformer>::evaluate(const Position&                         pos
- template<typename Arch, typename Transformer>
- void Network<Arch, Transformer>::verify(std::string                                  evalfilePath,
-                                         const std::function<void(std::string_view)>& f) const {
-+    return;  // Yep
+@@ -160,6 +160,9 @@ NetworkOutput Network::evaluate(const Position&    pos,
+ 
+ void Network::verify(std::string                                  evalfilePath,
+                      const std::function<void(std::string_view)>& f) const {
++
++    return; // Yep
 +
      if (evalfilePath.empty())
          evalfilePath = evalFile.defaultName;
  
 diff --git a/src/nnue/network.h b/src/nnue/network.h
-index cb433718..fc97a09f 100644
+index 5d7ba066..b914846f 100644
 --- a/src/nnue/network.h
 +++ b/src/nnue/network.h
-@@ -83,14 +83,15 @@ class Network {
-                                  AccumulatorStack&                       accumulatorStack,
-                                  AccumulatorCaches::Cache<FTDimensions>& cache) const;
+@@ -74,14 +74,15 @@ class Network {
+                                  AccumulatorStack&  accumulatorStack,
+                                  AccumulatorCaches& cache) const;
  
 +    std::optional<std::string> load(std::istream&);
 +
@@ -129,59 +103,6 @@ index cb433718..fc97a09f 100644
  
      bool read_header(std::istream&, std::uint32_t*, std::string*) const;
      bool write_header(std::ostream&, std::uint32_t, const std::string&) const;
-diff --git a/src/nnue/simd.h b/src/nnue/simd.h
-index 601792c1..2efc7a6a 100644
---- a/src/nnue/simd.h
-+++ b/src/nnue/simd.h
-@@ -35,6 +35,7 @@
-     #include <arm_neon.h>
- #endif
- 
-+
- #include "../types.h"
- #include "nnue_common.h"
- 
-@@ -337,11 +338,15 @@ fused(const typename VecWrapper::type& in, const T& operand, const Ts&... operan
-     return _mm_cvtsi128_si32(sum) + bias;
- }
- 
--[[maybe_unused]] static void m128_add_dpbusd_epi32(__m128i& acc, __m128i a, __m128i b) {
--
--    __m128i product0 = _mm_maddubs_epi16(a, b);
-+[[maybe_unused]] static void m128_add_dpbusd_epi32(__m128i& acc, __m128i activations_u7, __m128i weights_i8) {
-+#if defined(__wasm_relaxed_simd__)
-+    acc = (__m128i)wasm_i32x4_relaxed_dot_i8x16_i7x16_add(
-+        (v128_t)weights_i8, (v128_t)activations_u7, (v128_t)acc);
-+#else
-+    __m128i product0 = _mm_maddubs_epi16(activations_u7, weights_i8);
-     product0         = _mm_madd_epi16(product0, _mm_set1_epi16(1));
-     acc              = _mm_add_epi32(acc, product0);
-+#endif
- }
- 
- #endif
-diff --git a/src/search.cpp b/src/search.cpp
-index cc3c06d7..96ec7d61 100644
---- a/src/search.cpp
-+++ b/src/search.cpp
-@@ -586,8 +586,15 @@ void Search::Worker::clear() {
-     captureHistory.fill(-689);
- 
-     // Each thread is responsible for clearing their part of shared history
--    sharedHistory.correctionHistory.clear_range(0, numaThreadIdx, numaTotal);
--    sharedHistory.pawnHistory.clear_range(-1238, numaThreadIdx, numaTotal);
-+    auto&        correction = sharedHistory.correctionHistory;
-+    const size_t cStart     = numaThreadIdx * correction.get_size() / numaTotal;
-+    const size_t cEnd       = (numaThreadIdx + 1) * correction.get_size() / numaTotal;
-+    __builtin_memset(&correction[cStart], 0, (cEnd - cStart) * sizeof(correction[0]));
-+
-+    auto&        pawn   = sharedHistory.pawnHistory;
-+    const size_t pStart = numaThreadIdx * pawn.get_size() / numaTotal;
-+    const size_t pEnd   = (numaThreadIdx + 1) * pawn.get_size() / numaTotal;
-+    std::fill_n(reinterpret_cast<int16_t*>(&pawn[pStart]), (pEnd - pStart) * PIECE_NB * SQUARE_NB, -1238);
- 
-     ttMoveHistory = 0;
- 
 diff --git a/src/shm.h b/src/shm.h
 index d581bf08..8c1f7542 100644
 --- a/src/shm.h
@@ -236,10 +157,10 @@ index 08e8da10..917d27ec 100644
      void clear();
      void advance_nodes_time(std::int64_t nodes);
 diff --git a/src/uci.cpp b/src/uci.cpp
-index 92700768..622cc593 100644
+index 77d62e91..f9290c2f 100644
 --- a/src/uci.cpp
 +++ b/src/uci.cpp
-@@ -39,6 +39,8 @@
+@@ -40,6 +40,8 @@
  #include "types.h"
  #include "ucioption.h"
  
@@ -268,7 +189,7 @@ index 92700768..622cc593 100644
          std::istringstream is(cmd);
  
          token.clear();  // Avoid a stale if getline() returns nothing or a blank line
-@@ -175,7 +179,7 @@ void UCIEngine::loop() {
+@@ -172,7 +176,7 @@ void UCIEngine::loop() {
              sync_cout << "Unknown command: '" << cmd << "'. Type help for more information."
                        << sync_endl;
  
@@ -278,10 +199,10 @@ index 92700768..622cc593 100644
  
  Search::LimitsType UCIEngine::parse_limits(std::istream& is) {
 diff --git a/src/uci.h b/src/uci.h
-index ebc04fc3..5350eb27 100644
+index cfebc8af..4a16aa40 100644
 --- a/src/uci.h
 +++ b/src/uci.h
-@@ -54,8 +54,9 @@ class UCIEngine {
+@@ -56,8 +56,9 @@ class UCIEngine {
  
      auto& engine_options() { return engine.get_options(); }
  

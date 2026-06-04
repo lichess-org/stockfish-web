@@ -21,8 +21,16 @@
 
   const std::string load_nnue_cmd(Command& cmd) {
     std::istream in(&cmd);
-    if (cmd.index == 0) uci_global->engine.load_big_network(in);
-    else if (cmd.index == 1) uci_global->engine.load_small_network(in);
+    switch (cmd.index) {
+    case 0:
+      uci_global->engine.load_big_network(in);
+      break;
+    case 1:
+# ifdef EvalFileDefaultNameSmall
+      uci_global->engine.load_small_network(in);
+# endif
+      break;
+    }
     return "";
   }
 #endif

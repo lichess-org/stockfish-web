@@ -69,8 +69,8 @@ targets: dict[TargetName, Target] = {
         tags=["all", "dist"],
     ),
     TargetName("sf_dev"): Target(
-        repo=stockfish_repo,
-        commit="77d46ff61c3e33f7e9c1ef1f1b48315f23b04e80",
+        repo="https://github.com/anematode/Stockfish",
+        commit="14323160674d4c2e054d01463cf2cb7740e799f0",
         patch="sf_dev.patch",
         tags=["all", "dist"],
     ),
@@ -84,6 +84,9 @@ targets[TargetName("sf_dev_relaxed-simd")] = dataclasses.replace(targets[TargetN
 default_target = TargetName("sf_18_smallnet")
 
 ignore_sources = [
+    os.path.join("universal", "entry_arm64.cpp"),
+    os.path.join("universal", "entry_x86.cpp"),
+    os.path.join("universal", "nnue_embed.cpp"),
     "pyffish.cpp",
     "ffishjs.cpp",
 ]
