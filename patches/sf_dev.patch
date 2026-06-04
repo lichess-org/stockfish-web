@@ -103,46 +103,6 @@ index 5d7ba066..b914846f 100644
  
      bool read_header(std::istream&, std::uint32_t*, std::string*) const;
      bool write_header(std::ostream&, std::uint32_t, const std::string&) const;
-diff --git a/src/shm.h b/src/shm.h
-index d581bf08..8c1f7542 100644
---- a/src/shm.h
-+++ b/src/shm.h
-@@ -36,7 +36,7 @@
- #include <utility>
- #include <variant>
- 
--#if defined(__linux__) && !defined(__ANDROID__)
-+#if defined(__linux__) && !defined(__ANDROID__) && !defined(__EMSCRIPTEN__)
-     #include "shm_linux.h"
- #endif
- 
-@@ -137,7 +137,7 @@ inline std::string getExecutablePathHash() {
-         path_length          = len;
-     }
- 
--#elif defined(__linux__)
-+#elif defined(__linux__) && !defined(__EMSCRIPTEN__)
-     ssize_t len = readlink("/proc/self/exe", executable_path, sizeof(executable_path) - 1);
-     if (len >= 0)
-     {
-@@ -407,7 +407,7 @@ class SharedMemoryBackend {
-     std::string last_error_message;
- };
- 
--#elif defined(__linux__) && !defined(__ANDROID__)
-+#elif defined(__linux__) && !defined(__ANDROID__) && !defined(__EMSCRIPTEN__)
- 
- template<typename T>
- class SharedMemoryBackend {
-@@ -539,7 +539,7 @@ struct SystemWideSharedConstant {
-                       discriminator);
-         std::string shm_name = buf;
- 
--#if defined(__linux__) && !defined(__ANDROID__)
-+#if defined(__linux__) && !defined(__ANDROID__) && !defined(__EMSCRIPTEN__)
-         // POSIX shared memory names must start with a slash
-         shm_name = "/sf_" + createHashString(shm_name);
- 
 diff --git a/src/timeman.h b/src/timeman.h
 index 08e8da10..917d27ec 100644
 --- a/src/timeman.h
