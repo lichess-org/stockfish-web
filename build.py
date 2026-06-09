@@ -106,8 +106,8 @@ EXE = {name}
 
 CXX_FLAGS = {all_cxx_flags} -Isrc -pthread -msimd128 -mavx -flto -fno-exceptions \\
 	-DUSE_POPCNT -DUSE_SSE2 -DUSE_SSSE3 -DUSE_SSE41 -DNO_PREFETCH \\
-	-DNNUE_EMBEDDING_OFF \\
-	-DNO_TABLEBASES
+	-DNNUE_EMBEDDING_OFF -DNO_TABLEBASES \\
+	-DSTOCKFISH_WEB_{name.replace("_relaxed-simd", "").upper()}
 
 LD_FLAGS = {ld_flags} \\
 	--pre-js=../../src/initModule.js -sEXIT_RUNTIME -sEXPORT_ES6 -sEXPORT_NAME={mod_name(name)} \\

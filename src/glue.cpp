@@ -7,7 +7,7 @@
 #include "uci.h"
 #include "nnue/nnue_architecture.h"
 
-#if __has_include("nnue/evaluate_nnue.h") // fsf
+#if defined(STOCKFISH_WEB_FSF_14)
 # include "nnue/evaluate_nnue.h"
   const std::string load_nnue_cmd(Command& cmd) {
     std::istream in(&cmd);
@@ -16,7 +16,7 @@
     else std::cerr << "BAD_NNUE" << std::endl;
     return "setoption name Use NNUE value false";
   }
-#else // sf-18+
+#else
   extern Stockfish::UCIEngine* uci_global;
 
   const std::string load_nnue_cmd(Command& cmd) {
