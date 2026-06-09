@@ -1,3 +1,34 @@
+From a0549774dd8928763e6461acf2325096dc6c1dbe Mon Sep 17 00:00:00 2001
+From: Niklas Fiekas <niklas.fiekas@backscattering.de>
+Date: Tue, 9 Jun 2026 22:09:53 +0200
+Subject: [PATCH] stockfish-web patch
+
+Co-authored-by: sscg13 <iamdumbybear1@gmail.com>
+Co-authored-by: Shawn Xu <xu107288696@gmail.com>
+Co-authored-by: Jonathan Gamble <gamblej@gmail.com>
+---
+ scripts/net.sh                      |  3 +--
+ src/engine.cpp                      | 19 +------------------
+ src/engine.h                        | 10 +++++++++-
+ src/evaluate.cpp                    | 12 +-----------
+ src/evaluate.h                      |  3 +--
+ src/main.cpp                        | 11 ++++++++---
+ src/misc.cpp                        |  2 ++
+ src/nnue/network.cpp                | 14 +++-----------
+ src/nnue/network.h                  | 17 +++++------------
+ src/nnue/nnue_accumulator.cpp       |  6 +-----
+ src/nnue/nnue_accumulator.h         | 21 ++++-----------------
+ src/nnue/nnue_architecture.h        |  6 +-----
+ src/nnue/nnue_feature_transformer.h |  3 +--
+ src/nnue/simd.h                     | 11 ++++++++---
+ src/search.cpp                      | 11 +++++++++--
+ src/shm.h                           |  8 ++++----
+ src/syzygy/tbprobe.cpp              | 27 +++++++++++++++++++++++++++
+ src/timeman.h                       |  2 +-
+ src/uci.cpp                         | 10 +++++++---
+ src/uci.h                           |  3 ++-
+ 20 files changed, 96 insertions(+), 103 deletions(-)
+
 diff --git a/scripts/net.sh b/scripts/net.sh
 index 1aa1fbfb..50dd30a4 100755
 --- a/scripts/net.sh
@@ -621,3 +652,6 @@ index ebc04fc3..5350eb27 100644
      CommandLine cli;
  
      static void print_info_string(std::string_view str);
+-- 
+2.54.0
+

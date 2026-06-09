@@ -55,14 +55,14 @@ uci
 ### sf_18_smallnet (Stockfish 18 with sscg13/threat-small)
 
 - repo: https://github.com/official-stockfish/Stockfish
-- commit: [cb3d4ee9](https://github.com/official-stockfish/Stockfish/commit/cb3d4ee9b47d0c5aae855b12379378ea1439675c)
+- base: [cb3d4ee9](https://github.com/official-stockfish/Stockfish/commit/cb3d4ee9b47d0c5aae855b12379378ea1439675c)
 - tag: sf_18 (patch includes rebase of https://github.com/sscg13/Stockfish/tree/threat-small)
 - nnue: [nn-4ca89e4b3abf.nnue](https://tests.stockfishchess.org/api/nn/nn-4ca89e4b3abf.nnue)
 
 ### sf_18 (Stockfish 18)
 
 - repo: https://github.com/official-stockfish/Stockfish
-- commit: [cb3d4ee9](https://github.com/official-stockfish/Stockfish/commit/cb3d4ee9b47d0c5aae855b12379378ea1439675c)
+- base: [cb3d4ee9](https://github.com/official-stockfish/Stockfish/commit/cb3d4ee9b47d0c5aae855b12379378ea1439675c)
 - tag: sf_18
 - big nnue: [nn-c288c895ea92.nnue](https://tests.stockfishchess.org/api/nn/nn-c288c895ea92.nnue)
 - small nnue: [nn-37f18f62d772.nnue](https://tests.stockfishchess.org/api/nn/nn-37f18f62d772.nnue)
@@ -70,14 +70,14 @@ uci
 ### sf_dev (Stockfish dev-20260609-415ff793)
 
 - repo: https://github.com/official-stockfish/Stockfish
-- commit: [415ff793](https://github.com/official-stockfish/Stockfish/commit/415ff793a09ec8d029b6253c0eba4c8c106e61e7)
+- base: [415ff793](https://github.com/official-stockfish/Stockfish/commit/415ff793a09ec8d029b6253c0eba4c8c106e61e7)
 - tag: stockfish-dev-20260609-415ff793
 - nnue: [nn-71d6d32cb962.nnue](https://tests.stockfishchess.org/api/nn/nn-71d6d32cb962.nnue)
 
 ### fsf_14 (Fairy-Stockfish 14)
 
 - repo: https://github.com/fairy-stockfish/Fairy-Stockfish
-- commit: [a621470b](https://github.com/fairy-stockfish/Fairy-Stockfish/commit/a621470b91757699f935ba06d5f4bf48a60574b1)
+- base: [a621470b](https://github.com/fairy-stockfish/Fairy-Stockfish/commit/a621470b91757699f935ba06d5f4bf48a60574b1)
 - nnues: see repo links
 
 ## Older repositories kept for compatibility

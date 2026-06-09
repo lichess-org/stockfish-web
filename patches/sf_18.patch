@@ -1,3 +1,24 @@
+From 828f2342141886a32c792325486ead4db8ed2084 Mon Sep 17 00:00:00 2001
+From: Niklas Fiekas <niklas.fiekas@backscattering.de>
+Date: Tue, 9 Jun 2026 22:07:28 +0200
+Subject: [PATCH] stockfish-web patch
+
+Co-authored-by: Jonathan Gamble <gamblej@gmail.com>
+---
+ src/engine.h           | 14 ++++++++++++++
+ src/main.cpp           | 11 ++++++++---
+ src/misc.cpp           |  2 ++
+ src/nnue/network.cpp   |  2 ++
+ src/nnue/network.h     |  5 +++--
+ src/nnue/simd.h        | 11 ++++++++---
+ src/search.cpp         | 11 +++++++++--
+ src/shm.h              |  8 ++++----
+ src/syzygy/tbprobe.cpp | 27 +++++++++++++++++++++++++++
+ src/timeman.h          |  2 +-
+ src/uci.cpp            | 10 +++++++---
+ src/uci.h              |  3 ++-
+ 12 files changed, 87 insertions(+), 19 deletions(-)
+
 diff --git a/src/engine.h b/src/engine.h
 index 10c92d75..436830c8 100644
 --- a/src/engine.h
@@ -313,3 +334,6 @@ index ebc04fc3..5350eb27 100644
      CommandLine cli;
  
      static void print_info_string(std::string_view str);
+-- 
+2.54.0
+

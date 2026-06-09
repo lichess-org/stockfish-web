@@ -1,3 +1,19 @@
+From b5770d1aa0d358298d0607faae24b9be45ba8f22 Mon Sep 17 00:00:00 2001
+From: Niklas Fiekas <niklas.fiekas@backscattering.de>
+Date: Tue, 9 Jun 2026 22:02:28 +0200
+Subject: [PATCH] stockfish-web patch
+
+Co-authored-by: Jonathan Gamble <gamblej@gmail.com>
+---
+ src/evaluate.cpp       |  5 +++++
+ src/main.cpp           |  1 -
+ src/search.cpp         |  2 +-
+ src/syzygy/tbprobe.cpp | 22 ++++++++++++++++++++++
+ src/tt.cpp             |  4 ++++
+ src/uci.cpp            |  7 ++++---
+ src/ucioption.cpp      |  2 +-
+ 7 files changed, 37 insertions(+), 6 deletions(-)
+
 diff --git a/src/evaluate.cpp b/src/evaluate.cpp
 index 396d5ff6..fc0c285d 100644
 --- a/src/evaluate.cpp
@@ -143,3 +159,6 @@ index 0326e047..04053a38 100644
  #ifndef NNUE_EMBEDDING_OFF
    o["EvalFile"]              << Option(EvalFileDefaultName, on_eval_file);
  #else
+-- 
+2.54.0
+

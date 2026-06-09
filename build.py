@@ -39,39 +39,41 @@ patches_dir = script_dir / "patches"
 
 @dataclasses.dataclass
 class Target:
+    fish: str
     repo: str
     commit: str
-    patch: str
+    patches: list[str]
     tags: list[Tag]
     cxx_flags: list[str] = dataclasses.field(default_factory=list)
-
-    def patch_path(self) -> Path:
-        return patches_dir / self.patch
 
 
 targets: dict[TargetName, Target] = {
     TargetName("fsf_14"): Target(
+        fish="fsf_14",
         repo=fairy_stockfish_repo,
         commit="a621470b91757699f935ba06d5f4bf48a60574b1",
-        patch="fsf_14.patch",
+        patches=["fsf_14.patch"],
         tags=["all", "dist"],
     ),
     TargetName("sf_18_smallnet"): Target(
+        fish="sf_18_smallnet",
         repo=stockfish_repo,
         commit="cb3d4ee9b47d0c5aae855b12379378ea1439675c",
-        patch="sf_18_smallnet.patch",
+        patches=["sf_18_smallnet.patch"],
         tags=["all", "dist"],
     ),
     TargetName("sf_18"): Target(
+        fish="sf_18",
         repo=stockfish_repo,
         commit="cb3d4ee9b47d0c5aae855b12379378ea1439675c",
-        patch="sf_18.patch",
+        patches=["sf_18.patch"],
         tags=["all", "dist"],
     ),
     TargetName("sf_dev"): Target(
+        fish="sf_dev",
         repo=stockfish_repo,
         commit="415ff793a09ec8d029b6253c0eba4c8c106e61e7",
-        patch="sf_dev.patch",
+        patches=["sf_dev.patch"],
         tags=["all", "dist"],
     ),
 }
@@ -107,7 +109,7 @@ EXE = {name}
 CXX_FLAGS = {all_cxx_flags} -Isrc -pthread -msimd128 -mavx -flto -fno-exceptions \\
 	-DUSE_POPCNT -DUSE_SSE2 -DUSE_SSSE3 -DUSE_SSE41 -DNO_PREFETCH \\
 	-DNNUE_EMBEDDING_OFF -DNO_TABLEBASES \\
-	-DSTOCKFISH_WEB_{name.replace("_relaxed-simd", "").upper()}
+	-DSTOCKFISH_WEB_{target.fish.upper()}
 
 LD_FLAGS = {ld_flags} \\
 	--pre-js=../../src/initModule.js -sEXIT_RUNTIME -sEXPORT_ES6 -sEXPORT_NAME={mod_name(name)} \\
@@ -213,20 +215,23 @@ def fetch_sources(name: TargetName) -> None:
     target = targets[name]
     checkout_dir = fishes_dir / name
 
-    try:
-        checkout_dir.mkdir(parents=True, exist_ok=False)
-    except FileExistsError:
-        print(f"skipping clone and patch for {name} (already exists)")
-        return
-
     env = os.environ | {
         "GIT_CONFIG_COUNT": "1",
         "GIT_CONFIG_KEY_0": "advice.detachedHead",
         "GIT_CONFIG_VALUE_0": "false",
     }
-    subprocess.check_call(["git", "clone", target.repo, name], env=env, cwd=fishes_dir)
-    subprocess.check_call(["git", "checkout", target.commit], env=env, cwd=checkout_dir)
-    subprocess.check_call(["git", "apply", target.patch_path()], env=env, cwd=checkout_dir)
+
+    try:
+        checkout_dir.mkdir(parents=True, exist_ok=False)
+    except FileExistsError:
+        print(f"skipping clone and patch for {name} (already exists)")
+        subprocess.check_call(["git", "tag", "-f", "stockfish-web/base", target.commit], env=env, cwd=checkout_dir)
+    else:
+        subprocess.check_call(["git", "clone", target.repo, name], env=env, cwd=fishes_dir)
+        subprocess.check_call(["git", "checkout", target.commit], env=env, cwd=checkout_dir)
+        subprocess.check_call(["git", "tag", "-f", "stockfish-web/base", target.commit], env=env, cwd=checkout_dir)
+        for patch in target.patches:
+            subprocess.check_call(["git", "am", patches_dir / patch], env=env, cwd=checkout_dir)
 
 
 def clean() -> None:

@@ -1,3 +1,20 @@
+From 3b82a9f5550a2afa43bb97b50e972f900c6799ed Mon Sep 17 00:00:00 2001
+From: Niklas Fiekas <niklas.fiekas@backscattering.de>
+Date: Tue, 9 Jun 2026 22:13:56 +0200
+Subject: [PATCH] stockfish-web patch
+
+Co-authored-by: Jonathan Gamble <gamblej@gmail.com>
+---
+ src/engine.h         |  7 +++++++
+ src/main.cpp         | 11 ++++++++---
+ src/misc.cpp         |  2 ++
+ src/nnue/network.cpp |  3 +++
+ src/nnue/network.h   |  5 +++--
+ src/timeman.h        |  2 +-
+ src/uci.cpp          | 10 +++++++---
+ src/uci.h            |  3 ++-
+ 8 files changed, 33 insertions(+), 10 deletions(-)
+
 diff --git a/src/engine.h b/src/engine.h
 index be9226a7..8c5bddf6 100644
 --- a/src/engine.h
@@ -173,3 +190,6 @@ index 6c3186ff..07f638db 100644
      CommandLine cli;
  
      static void print_info_string(std::string_view str);
+-- 
+2.54.0
+
