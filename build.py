@@ -70,7 +70,7 @@ targets: dict[TargetName, Target] = {
     ),
     TargetName("sf_dev"): Target(
         repo=stockfish_repo,
-        commit="77d46ff61c3e33f7e9c1ef1f1b48315f23b04e80",
+        commit="415ff793a09ec8d029b6253c0eba4c8c106e61e7",
         patch="sf_dev.patch",
         tags=["all", "dist"],
     ),
@@ -84,7 +84,9 @@ targets[TargetName("sf_dev_relaxed-simd")] = dataclasses.replace(targets[TargetN
 default_target = TargetName("sf_18_smallnet")
 
 ignore_sources = [
-    os.path.join("syzygy", "tbprobe.cpp"),
+    os.path.join("universal", "entry_arm64.cpp"),
+    os.path.join("universal", "entry_x86.cpp"),
+    os.path.join("universal", "nnue_embed.cpp"),
     "pyffish.cpp",
     "ffishjs.cpp",
 ]
@@ -103,7 +105,9 @@ CXX = em++
 EXE = {name}
 
 CXX_FLAGS = {all_cxx_flags} -Isrc -pthread -msimd128 -mavx -flto -fno-exceptions \\
-	-DUSE_POPCNT -DUSE_SSE2 -DUSE_SSSE3 -DUSE_SSE41 -DNO_PREFETCH -DNNUE_EMBEDDING_OFF
+	-DUSE_POPCNT -DUSE_SSE2 -DUSE_SSSE3 -DUSE_SSE41 -DNO_PREFETCH \\
+	-DNNUE_EMBEDDING_OFF -DNO_TABLEBASES \\
+	-DSTOCKFISH_WEB_{name.replace("_relaxed-simd", "").upper()}
 
 LD_FLAGS = {ld_flags} \\
 	--pre-js=../../src/initModule.js -sEXIT_RUNTIME -sEXPORT_ES6 -sEXPORT_NAME={mod_name(name)} \\

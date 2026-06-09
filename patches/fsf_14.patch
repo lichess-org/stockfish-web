@@ -1,5 +1,5 @@
 diff --git a/src/evaluate.cpp b/src/evaluate.cpp
-index 396d5ff6..0500aa58 100644
+index 396d5ff6..fc0c285d 100644
 --- a/src/evaluate.cpp
 +++ b/src/evaluate.cpp
 @@ -77,6 +77,9 @@ namespace Eval {
@@ -46,6 +46,43 @@ index 77686ed0..b2db2bdd 100644
    const RootMoves& rootMoves = pos.this_thread()->rootMoves;
    size_t pvIdx = pos.this_thread()->pvIdx;
    size_t multiPV = std::min((size_t)Options["MultiPV"], rootMoves.size());
+diff --git a/src/syzygy/tbprobe.cpp b/src/syzygy/tbprobe.cpp
+index 36b2fd0a..287f0ada 100644
+--- a/src/syzygy/tbprobe.cpp
++++ b/src/syzygy/tbprobe.cpp
+@@ -37,6 +37,26 @@
+ 
+ #include "tbprobe.h"
+ 
++#ifdef NO_TABLEBASES
++
++namespace Stockfish::Tablebases {
++  int MaxCardinality = 0;
++  void init(const std::string& paths) {}
++  WDLScore probe_wdl(Position& p, ProbeState* r) {
++    *r = ProbeState::FAIL;
++    return WDLDraw;
++  }
++  int probe_dtz(Position& p, ProbeState* r) {
++    *r = ProbeState::FAIL;
++    return 0;
++  }
++
++  bool root_probe(Position& p, Search::RootMoves& rM) { return false; }
++  bool root_probe_wdl(Position& p, Search::RootMoves& rM) { return false; }
++}
++
++#else
++
+ #ifndef _WIN32
+ #include <fcntl.h>
+ #include <unistd.h>
+@@ -1634,3 +1654,5 @@ bool Tablebases::root_probe_wdl(Position& pos, Search::RootMoves& rootMoves) {
+ }
+ 
+ } // namespace Stockfish
++
++#endif // NO_TABLEBASES
 diff --git a/src/tt.cpp b/src/tt.cpp
 index 5982d937..062bdf62 100644
 --- a/src/tt.cpp

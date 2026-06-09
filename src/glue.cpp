@@ -3,11 +3,11 @@
 #include <string>
 
 #include "evaluate.h"
-#include "syzygy/tbprobe.h"
+#include "position.h"
 #include "uci.h"
 #include "nnue/nnue_architecture.h"
 
-#if __has_include("nnue/evaluate_nnue.h") // fsf
+#if defined(STOCKFISH_WEB_FSF_14)
 # include "nnue/evaluate_nnue.h"
   const std::string load_nnue_cmd(Command& cmd) {
     std::istream in(&cmd);
@@ -16,21 +16,22 @@
     else std::cerr << "BAD_NNUE" << std::endl;
     return "setoption name Use NNUE value false";
   }
-#else // sf-18+
+#else
   extern Stockfish::UCIEngine* uci_global;
 
   const std::string load_nnue_cmd(Command& cmd) {
     std::istream in(&cmd);
-    if (cmd.index == 0) uci_global->engine.load_big_network(in);
-    else if (cmd.index == 1) uci_global->engine.load_small_network(in);
-    return "";
-  }
-
-  namespace Stockfish::Tablebases {
-    Config rank_root_moves(const OptionsMap& o, Position& p, Search::RootMoves& rM, bool rankDTZ, const std::function<bool()>& timeAbort) {
-      for (auto& m: rM) m.tbRank = 0;
-      return Config();
+    switch (cmd.index) {
+    case 0:
+      uci_global->engine.load_big_network(in);
+      break;
+    case 1:
+# ifdef EvalFileDefaultNameSmall
+      uci_global->engine.load_small_network(in);
+# endif
+      break;
     }
+    return "";
   }
 #endif
 
@@ -70,20 +71,4 @@ EMSCRIPTEN_KEEPALIVE std::string js_getline() {
     return load_nnue_cmd(cmd);
   else
     return "";
-}
-
-namespace Stockfish::Tablebases {
-  int MaxCardinality = 0;
-  void init(const std::string& paths) {}
-  WDLScore probe_wdl(Position& p, ProbeState* r) {
-    *r = ProbeState::FAIL;
-    return WDLDraw;
-  }
-  int probe_dtz(Position& p, ProbeState* r) {
-    *r = ProbeState::FAIL;
-    return 0;
-  }
-
-  bool root_probe(Position& p, Search::RootMoves& rM) { return false; }
-  bool root_probe_wdl(Position& p, Search::RootMoves& rM) { return false; }
 }

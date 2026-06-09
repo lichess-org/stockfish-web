@@ -448,7 +448,7 @@ index 25891163..9ace7370 100644
  
  #endif
 diff --git a/src/search.cpp b/src/search.cpp
-index 40ba2eff..befaa2a8 100644
+index 40ba2eff..361dc0d8 100644
 --- a/src/search.cpp
 +++ b/src/search.cpp
 @@ -588,8 +588,15 @@ void Search::Worker::clear() {
@@ -509,6 +509,48 @@ index e1256b26..176d1988 100644
          // POSIX shared memory names must start with a slash
          shm_name = "/sf_" + createHashString(shm_name);
  
+diff --git a/src/syzygy/tbprobe.cpp b/src/syzygy/tbprobe.cpp
+index 9fe6df9d..8f26bbb0 100644
+--- a/src/syzygy/tbprobe.cpp
++++ b/src/syzygy/tbprobe.cpp
+@@ -45,6 +45,31 @@
+ #include "../types.h"
+ #include "../ucioption.h"
+ 
++#ifdef NO_TABLEBASES
++
++namespace Stockfish::Tablebases {
++  int MaxCardinality = 0;
++  void init(const std::string& paths) {}
++  WDLScore probe_wdl(Position& p, ProbeState* r) {
++    *r = ProbeState::FAIL;
++    return WDLDraw;
++  }
++  int probe_dtz(Position& p, ProbeState* r) {
++    *r = ProbeState::FAIL;
++    return 0;
++  }
++
++  bool root_probe(Position& p, Search::RootMoves& rM) { return false; }
++  bool root_probe_wdl(Position& p, Search::RootMoves& rM) { return false; }
++
++  Config rank_root_moves(const OptionsMap& o, Position& p, Search::RootMoves& rM, bool rankDTZ, const std::function<bool()>& timeAbort) {
++    for (auto& m: rM) m.tbRank = 0;
++    return Config();
++  }
++}
++
++#else
++
+ #ifndef _WIN32
+     #include <fcntl.h>
+     #include <sys/mman.h>
+@@ -1774,3 +1799,5 @@ Config Tablebases::rank_root_moves(const OptionsMap&            options,
+     return config;
+ }
+ }  // namespace Stockfish
++
++#endif // NO_TABLEBASES
 diff --git a/src/timeman.h b/src/timeman.h
 index 08e8da10..917d27ec 100644
 --- a/src/timeman.h
