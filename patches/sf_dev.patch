@@ -1,8 +1,8 @@
 diff --git a/src/engine.h b/src/engine.h
-index f5d09d4e..01a69863 100644
+index be9226a7..8c5bddf6 100644
 --- a/src/engine.h
 +++ b/src/engine.h
-@@ -92,6 +92,13 @@ class Engine {
+@@ -91,6 +91,13 @@ class Engine {
      void                                 load_network(const std::string& file);
      void save_network(std::pair<std::optional<std::string>, std::string> file);
  
@@ -48,7 +48,7 @@ index c386c418..ea9bf686 100644
      return 0;
  }
 diff --git a/src/misc.cpp b/src/misc.cpp
-index d144a26f..14bc016c 100644
+index 4e7b912a..4216209d 100644
 --- a/src/misc.cpp
 +++ b/src/misc.cpp
 @@ -508,6 +508,7 @@ bool is_whitespace(std::string_view s) {
@@ -68,7 +68,7 @@ index d144a26f..14bc016c 100644
      char        buff[40000];
      char*       cwd = GETCWD(buff, 40000);
 diff --git a/src/nnue/network.cpp b/src/nnue/network.cpp
-index 382f4f44..94268d4f 100644
+index 20149c73..42fc7da8 100644
 --- a/src/nnue/network.cpp
 +++ b/src/nnue/network.cpp
 @@ -160,6 +160,9 @@ NetworkOutput Network::evaluate(const Position&    pos,
@@ -82,10 +82,10 @@ index 382f4f44..94268d4f 100644
          evalfilePath = evalFile.defaultName;
  
 diff --git a/src/nnue/network.h b/src/nnue/network.h
-index 5d7ba066..b914846f 100644
+index 4a17501f..44f89b66 100644
 --- a/src/nnue/network.h
 +++ b/src/nnue/network.h
-@@ -74,14 +74,15 @@ class Network {
+@@ -73,14 +73,15 @@ class Network {
                                   AccumulatorStack&  accumulatorStack,
                                   AccumulatorCaches& cache) const;
  
@@ -101,13 +101,13 @@ index 5d7ba066..b914846f 100644
 -    std::optional<std::string> load(std::istream&);
 +    bool save(std::ostream&, const std::string&, const std::string&) const;
  
-     bool read_header(std::istream&, std::uint32_t*, std::string*) const;
-     bool write_header(std::ostream&, std::uint32_t, const std::string&) const;
+     bool read_header(std::istream&, u32*, std::string*) const;
+     bool write_header(std::ostream&, u32, const std::string&) const;
 diff --git a/src/timeman.h b/src/timeman.h
-index 08e8da10..917d27ec 100644
+index 4439f84c..a2aa08e8 100644
 --- a/src/timeman.h
 +++ b/src/timeman.h
-@@ -48,7 +48,7 @@ class TimeManagement {
+@@ -47,7 +47,7 @@ class TimeManagement {
      TimePoint elapsed(FUNC nodes) const {
          return useNodesTime ? TimePoint(nodes()) : elapsed_time();
      }
@@ -115,12 +115,12 @@ index 08e8da10..917d27ec 100644
 +    TimePoint elapsed_time() const { return std::max(now() - startTime, TimePoint(1)); };
  
      void clear();
-     void advance_nodes_time(std::int64_t nodes);
+     void advance_nodes_time(i64 nodes);
 diff --git a/src/uci.cpp b/src/uci.cpp
-index 77d62e91..f9290c2f 100644
+index 39268b05..227a5eaa 100644
 --- a/src/uci.cpp
 +++ b/src/uci.cpp
-@@ -40,6 +40,8 @@
+@@ -39,6 +39,8 @@
  #include "types.h"
  #include "ucioption.h"
  
@@ -129,7 +129,7 @@ index 77d62e91..f9290c2f 100644
  namespace Stockfish {
  
  constexpr auto BenchmarkCommand = "speedtest";
-@@ -65,8 +67,8 @@ void UCIEngine::print_info_string(std::string_view str) {
+@@ -64,8 +66,8 @@ void UCIEngine::print_info_string(std::string_view str) {
  }
  
  UCIEngine::UCIEngine(int argc, char** argv) :
@@ -140,7 +140,7 @@ index 77d62e91..f9290c2f 100644
  
      engine.get_options().add_info_listener([](const std::optional<std::string>& str) {
          if (str.has_value())
-@@ -97,6 +99,8 @@ void UCIEngine::loop() {
+@@ -96,6 +98,8 @@ void UCIEngine::loop() {
              && !getline(std::cin, cmd))  // Wait for an input or an end-of-file (EOF) indication
              cmd = "quit";
  
@@ -149,7 +149,7 @@ index 77d62e91..f9290c2f 100644
          std::istringstream is(cmd);
  
          token.clear();  // Avoid a stale if getline() returns nothing or a blank line
-@@ -172,7 +176,7 @@ void UCIEngine::loop() {
+@@ -171,7 +175,7 @@ void UCIEngine::loop() {
              sync_cout << "Unknown command: '" << cmd << "'. Type help for more information."
                        << sync_endl;
  
@@ -159,10 +159,10 @@ index 77d62e91..f9290c2f 100644
  
  Search::LimitsType UCIEngine::parse_limits(std::istream& is) {
 diff --git a/src/uci.h b/src/uci.h
-index cfebc8af..4a16aa40 100644
+index 6c3186ff..07f638db 100644
 --- a/src/uci.h
 +++ b/src/uci.h
-@@ -56,8 +56,9 @@ class UCIEngine {
+@@ -55,8 +55,9 @@ class UCIEngine {
  
      auto& engine_options() { return engine.get_options(); }
  

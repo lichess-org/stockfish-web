@@ -67,11 +67,11 @@ uci
 - big nnue: [nn-c288c895ea92.nnue](https://tests.stockfishchess.org/api/nn/nn-c288c895ea92.nnue)
 - small nnue: [nn-37f18f62d772.nnue](https://tests.stockfishchess.org/api/nn/nn-37f18f62d772.nnue)
 
-### sf_dev (Stockfish dev anematode/wasm-port)
+### sf_dev (Stockfish dev-20260609-415ff793)
 
-- repo: https://github.com/anematode/Stockfish
-- commit: [14323160](https://github.com/official-stockfish/Stockfish/commit/14323160674d4c2e054d01463cf2cb7740e799f0)
-- tag: *none*
+- repo: https://github.com/official-stockfish/Stockfish
+- commit: [415ff793](https://github.com/official-stockfish/Stockfish/commit/415ff793a09ec8d029b6253c0eba4c8c106e61e7)
+- tag: stockfish-dev-20260609-415ff793
 - nnue: [nn-71d6d32cb962.nnue](https://tests.stockfishchess.org/api/nn/nn-71d6d32cb962.nnue)
 
 ### fsf_14 (Fairy-Stockfish 14)

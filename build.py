@@ -69,8 +69,8 @@ targets: dict[TargetName, Target] = {
         tags=["all", "dist"],
     ),
     TargetName("sf_dev"): Target(
-        repo="https://github.com/anematode/Stockfish",
-        commit="14323160674d4c2e054d01463cf2cb7740e799f0",
+        repo=stockfish_repo,
+        commit="415ff793a09ec8d029b6253c0eba4c8c106e61e7",
         patch="sf_dev.patch",
         tags=["all", "dist"],
     ),
