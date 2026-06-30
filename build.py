@@ -19,6 +19,10 @@ fairy_stockfish_repo = "https://github.com/fairy-stockfish/Fairy-Stockfish"
 emcc_version_min = (5, 0, 5)
 emcc_version_max = (7, 0, 0)
 
+emcc_bad_versions = [
+    (6, 0, 1), (6, 0, 2), # https://github.com/emscripten-core/emscripten/pull/27173
+]
+
 TargetName = NewType("TargetName", str)
 Tag = Literal["all", "legacy", "dist"]
 
@@ -260,6 +264,9 @@ def assert_emsdk() -> None:
     emcc_version = tuple(int(g) for g in version_match.groups())
     if not (emcc_version_min <= emcc_version < emcc_version_max):
         print(f"got emsdk {join_version(emcc_version)}, required >={join_version(emcc_version_min)},<{join_version(emcc_version_max)}")
+        sys.exit(1)
+    if emcc_version in emcc_bad_versions:
+        print(f"got emsdk {join_version(emcc_version)}, which is known to be broken (avoid: {', '.join(join_version(v) for v in emcc_bad_versions)})")
         sys.exit(1)
 
 
