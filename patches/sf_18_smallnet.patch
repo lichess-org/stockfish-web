@@ -1,7 +1,9 @@
-From a0549774dd8928763e6461acf2325096dc6c1dbe Mon Sep 17 00:00:00 2001
+From db873ba5f51cc15fe7426a0287017f8a9b1ea8cf Mon Sep 17 00:00:00 2001
 From: Niklas Fiekas <niklas.fiekas@backscattering.de>
 Date: Tue, 9 Jun 2026 22:09:53 +0200
 Subject: [PATCH] stockfish-web patch
+
+Bench: 3039373
 
 Co-authored-by: sscg13 <iamdumbybear1@gmail.com>
 Co-authored-by: Shawn Xu <xu107288696@gmail.com>
