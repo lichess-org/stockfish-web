@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "target": "esnext",
+    "lib": ["esnext"],
+    "types": ["node"],
+    "strict": true,
+    "erasableSyntaxOnly": true,
+    "noEmit": true
+  },
+  "include": ["tools/**/*.ts", "stockfishWeb.d.ts"]
+}

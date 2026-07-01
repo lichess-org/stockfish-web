@@ -20,19 +20,25 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     outputs:
       artifact-name: dist
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Determine Emscripten version
-        id: emscripten
-        run: echo "VERSION=$(./build.py --emcc-version)" >> "$GITHUB_OUTPUT"
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.2.0
+        with:
+          version-file: .tool-versions
 
-      - name: Setup emscripten SDK
+      - name: Typecheck build.py
+        run: uv run mypy --strict build.py
+
+      - name: Determine emscripten version
+        id: emscripten
+        run: echo "VERSION=$(uv run build.py --emcc-version)" >> "$GITHUB_OUTPUT"
+
+      - name: Setup emscripten
         uses: mymindstorm/setup-emsdk@v16
         with:
           version: ${{ steps.emscripten.outputs.VERSION }}
@@ -40,13 +46,31 @@ jobs:
       - name: Show emcc version
         run: emcc --version
 
+      - name: Setup node (for bench verification)
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .tool-versions
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck tools
+        run: npx tsc
+
+      - name: Cache network files
+        uses: actions/cache@v6
+        with:
+          path: nn-*.nnue
+          key: nnue-${{ hashFiles('build.py', 'patches/**') }}
+          restore-keys: nnue-
+
       - name: Configure committer
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
 
-      - name: Build stockfishes
-        run: ./build.py dist
+      - name: Build and verify stockfishes
+        run: uv run build.py dist --verify-bench
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v7
@@ -78,10 +102,10 @@ jobs:
         with:
           name: dist
 
-      - name: Setup Node (for npm publish)
+      - name: Setup node (for npm publish)
         uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version-file: .tool-versions
           registry-url: https://registry.npmjs.org/
 
       - name: Bump package.json

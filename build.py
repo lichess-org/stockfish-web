@@ -8,6 +8,7 @@ import os
 import os.path
 import re
 import sys
+import threading
 
 from pathlib import Path
 from typing import Iterable, Literal, NewType
@@ -33,7 +34,7 @@ default_cxx_flags = [
 ]
 
 default_ld_flags = [
-    "-sENVIRONMENT=web,worker",
+    "-sENVIRONMENT=web,worker,node",
 ]
 
 script_dir = Path(__file__).resolve().parent
@@ -155,11 +156,14 @@ def main() -> None:
     )
     parser.add_argument(
         "--ld-flags",
-        help="em++ linker flags. for node use --ld-flags='-sENVIRONMENT=node'. default: '%(default)s'",
+        help="em++ linker flags. default: '%(default)s'",
         default=" ".join(default_ld_flags),
     )
     parser.add_argument(
         "--emcc-version", action="store_true", help="print required emscripten version and exit"
+    )
+    parser.add_argument(
+        "--verify-bench", action="store_true", help="after building verify bench against commit history"
     )
     parser.add_argument(
         "targets",
@@ -193,6 +197,8 @@ def main() -> None:
         print("")
         print(f"# {name}")
         build_target(name, args.cxx_flags, args.ld_flags)
+        if args.verify_bench:
+            verify_bench(name)
 
 
 def build_target(name: TargetName, cxx_flags: str, ld_flags: str) -> None:
@@ -213,6 +219,72 @@ def build_target(name: TargetName, cxx_flags: str, ld_flags: str) -> None:
 
     for asset in [f"{name}.js", f"{name}.wasm"]:
         (target_dir / asset).replace(script_dir / asset)
+
+
+def verify_bench(name: TargetName) -> None:
+    reference = bench_reference(name)
+    if reference is None:
+        print(f"no bench reference found in commit history for {name}")
+        sys.exit(1)
+    print(f"reference bench: {reference}")
+
+    signature = bench_run(name)
+    if signature is None:
+        print(f"no bench signature obtained for {name} (crash or timeout?)")
+        sys.exit(1)
+    if signature != reference:
+        print(f"bench signature mismatch for {name}: reference {reference}, obtained {signature}")
+        sys.exit(1)
+    print(f"bench signature ok for {name}: {signature}")
+
+
+def bench_reference(name: TargetName) -> str | None:
+    bench_re = re.compile(r"^[ \t]*[Bb]ench[ :]+([0-9]+)[ \t]*$", re.MULTILINE)
+
+    body = subprocess.check_output(
+        ["git", "log", "--max-count=1", "--format=%B",
+         "--extended-regexp", "--grep", r"^[[:space:]]*[Bb]ench[ :]+[0-9]+[[:space:]]*$", "HEAD"],
+        cwd=fishes_dir / name,
+        text=True,
+    )
+    matches = bench_re.findall(body)
+    return matches[-1] if matches else None
+
+
+def bench_run(name: TargetName) -> str | None:
+    signature_re = re.compile(r"Nodes searched\s*:\s*([0-9]+)")
+
+    proc = subprocess.Popen(
+        ["node", str(script_dir / "tools" / "wasm-cli.ts"), f"{name}.js"],
+        cwd=script_dir,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+    assert proc.stdin is not None and proc.stdout is not None
+
+    watchdog = threading.Timer(300, proc.kill)
+    watchdog.start()
+
+    signature = None
+    try:
+        proc.stdin.write("bench\n")
+        proc.stdin.close()
+        for line in proc.stdout:
+            sys.stdout.write(line)
+            match = signature_re.search(line)
+            if match:
+                signature = match.group(1)
+                break
+    finally:
+        watchdog.cancel()
+        proc.terminate()
+        try:
+            proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+    return signature
 
 
 def fetch_sources(name: TargetName) -> None:
