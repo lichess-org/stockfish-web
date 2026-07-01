@@ -28,11 +28,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Determine Emscripten version
+      - name: Determine emscripten version
         id: emscripten
         run: echo "VERSION=$(./build.py --emcc-version)" >> "$GITHUB_OUTPUT"
 
-      - name: Setup emscripten SDK
+      - name: Setup emscripten
         uses: mymindstorm/setup-emsdk@v16
         with:
           version: ${{ steps.emscripten.outputs.VERSION }}
@@ -40,7 +40,7 @@ jobs:
       - name: Show emcc version
         run: emcc --version
 
-      - name: Setup Node (for bench verification)
+      - name: Setup node (for bench verification)
         uses: actions/setup-node@v6
         with:
           node-version: 24
@@ -90,7 +90,7 @@ jobs:
         with:
           name: dist
 
-      - name: Setup Node (for npm publish)
+      - name: Setup node (for npm publish)
         uses: actions/setup-node@v6
         with:
           node-version: 24
