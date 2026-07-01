@@ -11,13 +11,13 @@ Check out https://github.com/nmrugg/stockfish.js for a simpler browser Stockfish
 ## Building
 
 ```
-# Example: Clean and make all web targets
-./build.py all clean
+# Example: Clean and make all targets
+./build.py clean all
 ```
 
-Use `--cxx-flags` to override the default emcc flags which are `-O3 -DNDEBUG --closure=1`.
+Use `--cxx-flags` to override the default emcc flags (`-O3 -DNDEBUG --closure=1`).
 
-Use `--ld-flags` to override default linker flags (`--ld-flags='-sENVIRONMENT=node'` to target node).
+Use `--ld-flags` to override default linker flags (`--ld-flags='-sENVIRONMENT=web,worker,node'`).
 
 Check `./build.py --help` for all available targets.
 
@@ -35,9 +35,9 @@ To avoid installing or changing your emscripten version, use `./build-with-docke
 Edit the Stockfish sources within `./fishes`. Contribute your edits via patch file.
 
 ```
-# Example: Update `sf_18.patch` with your source changes:
+# Example: Update `sf_18.patch` with your commits
 cd fishes/sf_18
-git diff > ../../patches/sf_18.patch
+git format-patch stockfish-web/base --stdout > ../../patches/sf_18.patch
 ```
 
 ## Run locally on node
