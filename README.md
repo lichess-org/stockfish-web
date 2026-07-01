@@ -42,12 +42,12 @@ git format-patch stockfish-web/base --stdout > ../../patches/sf_18.patch
 
 ## Run locally on node
 
-`./tools/wasm-cli.js` bootstraps the emscripten module and also automatically downloads the required
+`./tools/wasm-cli.ts` bootstraps the emscripten module and also automatically downloads the required
 nnue files into the current working directory.
 
 ```
 ./build.py
-node ./tools/wasm-cli.js ./sf_18.js
+node ./tools/wasm-cli.ts ./sf_18.js
 uci
 ```
 

@@ -5,5 +5,9 @@
 /*.js
 /*.wasm
 
+/node_modules
+
+/__pycache__
+
 .vscode/
 .DS_Store

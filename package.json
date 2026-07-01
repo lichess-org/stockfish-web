@@ -23,5 +23,9 @@
     "fsf_14.js",
     "fsf_14.wasm",
     "stockfishWeb.d.ts"
-  ]
+  ],
+  "devDependencies": {
+    "@types/node": "^26.1.0",
+    "typescript": "^6.0.3"
+  }
 }

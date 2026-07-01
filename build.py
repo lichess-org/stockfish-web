@@ -255,7 +255,7 @@ def bench_run(name: TargetName) -> str | None:
     signature_re = re.compile(r"Nodes searched\s*:\s*([0-9]+)")
 
     proc = subprocess.Popen(
-        ["node", str(script_dir / "tools" / "wasm-cli.js"), f"{name}.js"],
+        ["node", str(script_dir / "tools" / "wasm-cli.ts"), f"{name}.js"],
         cwd=script_dir,
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,

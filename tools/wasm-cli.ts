@@ -3,11 +3,17 @@ import * as fs from 'node:fs/promises';
 import * as crypto from 'node:crypto';
 import * as path from 'node:path';
 
-function checksumNnue(buf) {
+interface StockfishWeb {
+  uci(command: string): void;
+  setNnueBuffer(data: Uint8Array, index?: number): void;
+  getRecommendedNnue(index?: number): string | undefined;
+}
+
+function checksumNnue(buf: Buffer): string {
   return crypto.createHash('sha256').update(buf).digest('hex').slice(0, 12);
 }
 
-async function ensureNnue(filepath) {
+async function ensureNnue(filepath: string): Promise<Buffer> {
   const filename = path.basename(filepath);
   const match = filename.match(/^nn-([0-9a-f]{12})\.nnue$/);
 
@@ -24,14 +30,16 @@ async function ensureNnue(filepath) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`failed to download ${url}: ${res.status} ${res.statusText}`);
   const buf = Buffer.from(await res.arrayBuffer());
-  if (checksumNnue(buf) !== match[1]) throw new Error(`${url}: downloaded file failed checksum validation`);
+  if (checksumNnue(buf) !== match![1]) throw new Error(`${url}: downloaded file failed checksum validation`);
 
   await fs.writeFile(filepath, buf);
   return buf;
 }
 
-const createStockfish = await import(`../${process.argv[2] ?? 'sf_18.js'}`);
-let history = [],
+const createStockfish = (await import(`../${process.argv[2] ?? 'sf_18.js'}`)) as {
+  default: () => Promise<StockfishWeb>;
+};
+let history: string[] = [],
   index = 0;
 
 const sf = await createStockfish.default();
