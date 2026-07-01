@@ -26,7 +26,7 @@ jobs:
       artifact-name: dist
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Determine Emscripten version
         id: emscripten
@@ -71,7 +71,7 @@ jobs:
           (echo "Version must start with 'v' and match 'v<major>.<minor>.<patch>'" && exit 1)
 
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Download build artifacts
         uses: actions/download-artifact@v8
