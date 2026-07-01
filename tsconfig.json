@@ -9,5 +9,5 @@
     "erasableSyntaxOnly": true,
     "noEmit": true
   },
-  "include": ["tools/**/*.ts"]
+  "include": ["tools/**/*.ts", "stockfishWeb.d.ts"]
 }

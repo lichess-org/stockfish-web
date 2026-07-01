@@ -2,12 +2,7 @@ import * as readline from 'node:readline';
 import * as fs from 'node:fs/promises';
 import * as crypto from 'node:crypto';
 import * as path from 'node:path';
-
-interface StockfishWeb {
-  uci(command: string): void;
-  setNnueBuffer(data: Uint8Array, index?: number): void;
-  getRecommendedNnue(index?: number): string | undefined;
-}
+import type StockfishWeb from '@lichess-org/stockfish-web';
 
 function checksumNnue(buf: Buffer): string {
   return crypto.createHash('sha256').update(buf).digest('hex').slice(0, 12);
