@@ -33,7 +33,7 @@ default_cxx_flags = [
 ]
 
 default_ld_flags = [
-    "-sENVIRONMENT=web,worker",
+    "-sENVIRONMENT=web,worker,node",
 ]
 
 script_dir = Path(__file__).resolve().parent
@@ -155,7 +155,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--ld-flags",
-        help="em++ linker flags. for node use --ld-flags='-sENVIRONMENT=node'. default: '%(default)s'",
+        help="em++ linker flags. default: '%(default)s'",
         default=" ".join(default_ld_flags),
     )
     parser.add_argument(

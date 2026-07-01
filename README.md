@@ -46,7 +46,7 @@ git diff > ../../patches/sf_18.patch
 nnue files into the current working directory.
 
 ```
-./build.py --ld-flags='-sENVIRONMENT=node'
+./build.py
 node ./tools/wasm-cli.js ./sf_18.js
 uci
 ```
