@@ -16,6 +16,7 @@ on:
 permissions:
   contents: read
 
+jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
@@ -26,7 +27,7 @@ permissions:
         uses: actions/checkout@v7
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v8
+        uses: astral-sh/setup-uv@v8.2.0
         with:
           version-file: .tool-versions
 
@@ -69,7 +70,7 @@ permissions:
           git config --global user.email "github-actions@github.com"
 
       - name: Build and verify stockfishes
-        run: ./build.py dist --verify-bench
+        run: uv run build.py dist --verify-bench
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v7
