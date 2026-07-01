@@ -42,11 +42,12 @@ git diff > ../../patches/sf_18.patch
 
 ## Run locally on node
 
-Download the required nnues from the list below. Then:
+`./tools/wasm-cli.js` bootstraps the emscripten module and also automatically downloads the required
+nnue files into the current working directory.
 
 ```
 ./build.py --ld-flags='-sENVIRONMENT=node'
-node ./src/wasm-cli.js ./sf_18.js
+node ./tools/wasm-cli.js ./sf_18.js
 uci
 ```
 
