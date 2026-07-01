@@ -40,13 +40,25 @@ jobs:
       - name: Show emcc version
         run: emcc --version
 
+      - name: Setup Node (for bench verification)
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Cache network files
+        uses: actions/cache@v6
+        with:
+          path: nn-*.nnue
+          key: nnue-${{ hashFiles('build.py', 'patches/**') }}
+          restore-keys: nnue-
+
       - name: Configure committer
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
 
-      - name: Build stockfishes
-        run: ./build.py dist
+      - name: Build and verify stockfishes
+        run: ./build.py dist --verify-bench
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v7
