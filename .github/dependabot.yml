@@ -8,3 +8,19 @@ updates:
       github-actions:
         patterns:
           - '*'
+  - package-ecosystem: npm
+    directory: '/'
+    schedule:
+      interval: monthly
+    groups:
+      npm:
+        patterns:
+          - '*'
+  - package-ecosystem: uv
+    directory: '/'
+    schedule:
+      interval: monthly
+    groups:
+      uv:
+        patterns:
+          - '*'
