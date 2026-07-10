@@ -11,8 +11,8 @@ Check out https://github.com/nmrugg/stockfish.js for a simpler browser Stockfish
 ## Building
 
 ```
-# Example: Clean and make all targets
-./build.py clean all
+# Example: Clean and make all targets with pgo and final bench signature verification
+./build.py clean all --pgo --verify-bench
 ```
 
 Use `--cxx-flags` to override the default emcc flags (`-O3 -DNDEBUG --closure=1`).
