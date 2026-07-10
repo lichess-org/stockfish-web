@@ -77,7 +77,7 @@ targets: dict[TargetName, Target] = {
     TargetName("sf_dev"): Target(
         fish="sf_dev",
         repo=stockfish_repo,
-        commit="415ff793a09ec8d029b6253c0eba4c8c106e61e7",
+        commit="924d29d3cab85f45a877a5da0eeeb73a52cb4b62",
         patches=["sf_dev.patch"],
         tags=["all", "dist"],
     ),
@@ -92,6 +92,7 @@ default_target = TargetName("sf_18_smallnet")
 
 ignore_sources = [
     os.path.join("universal", "entry_arm64.cpp"),
+    os.path.join("universal", "entry_riscv64.cpp"),
     os.path.join("universal", "entry_x86.cpp"),
     os.path.join("universal", "nnue_embed.cpp"),
     "pyffish.cpp",
