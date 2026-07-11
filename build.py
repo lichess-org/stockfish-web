@@ -119,7 +119,7 @@ CXX_FLAGS = {all_cxx_flags} -Isrc -pthread -msimd128 -mavx -flto -fno-exceptions
 LD_FLAGS = {ld_flags} \\
 	--pre-js=../../src/initModule.js -sEXIT_RUNTIME -sEXPORT_ES6 -sEXPORT_NAME={mod_name(name)} \\
 	-sEXPORTED_FUNCTIONS='[_malloc,_main]' -sEXPORTED_RUNTIME_METHODS='[stringToUTF8,UTF8ToString,HEAPU8]' \\
-	-sINCOMING_MODULE_JS_API='[locateFile,print,printErr,wasmMemory,buffer,instantiateWasm,mainScriptUrlOrBlob]' \\
+	-sINCOMING_MODULE_JS_API='[locateFile,print,printErr,wasmMemory,buffer,instantiateWasm,mainScriptUrlOrBlob,onExit]' \\
 	-sINITIAL_MEMORY=64MB -sALLOW_MEMORY_GROWTH -sSTACK_SIZE=3MB -sSTRICT -sPROXY_TO_PTHREAD \\
 	-sALLOW_BLOCKING_ON_MAIN_THREAD=0 -Wno-pthreads-mem-growth
 
@@ -276,14 +276,12 @@ def bench_run(name: TargetName) -> str | None:
             match = signature_re.search(line)
             if match:
                 signature = match.group(1)
-                break
+        if proc.wait() != 0:
+            signature = None  # Fail on unclean exit
     finally:
         watchdog.cancel()
-        proc.terminate()
-        try:
-            proc.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            proc.kill()
+        proc.kill()
+        proc.wait()
     return signature
 
 
