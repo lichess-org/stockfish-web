@@ -34,8 +34,6 @@ async function ensureNnue(filepath: string): Promise<Buffer> {
 const createStockfish = (await import(`../${process.argv[2] ?? 'sf_18.js'}`)) as {
   default: () => Promise<StockfishWeb>;
 };
-let history: string[] = [],
-  index = 0;
 
 const sf = await createStockfish.default();
 
@@ -55,23 +53,9 @@ const rl = readline.createInterface({
 rl.on('SIGINT', process.exit);
 
 rl.on('line', async line => {
-  history.push(line);
-  index = history.length;
   if (line.startsWith('load ')) sf.setNnueBuffer(await ensureNnue(line.slice(5)), 0);
   else if (line.startsWith('big ')) sf.setNnueBuffer(await ensureNnue(line.slice(4)), 0);
   else if (line.startsWith('small ')) sf.setNnueBuffer(await ensureNnue(line.slice(6)), 1);
   else if (line === 'exit' || line === 'quit') process.exit();
   else sf.uci(line);
-});
-
-process.stdin.on('keypress', (_, key) => {
-  if (key.name === 'up') {
-    if (index < 1) return;
-    rl.write(null, { ctrl: true, name: 'u' });
-    rl.write(history[--index]);
-  } else if (key.name === 'down') {
-    if (index > history.length - 2) return;
-    rl.write(null, { ctrl: true, name: 'u' });
-    rl.write(history[++index]);
-  }
 });
