@@ -71,7 +71,7 @@ jobs:
           git config --global user.email "github-actions@github.com"
 
       - name: Build and verify stockfishes
-        run: uv run build.py dist --verify-bench
+        run: uv run build.py dist --pgo --verify-bench
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v7

@@ -28,9 +28,9 @@ TargetName = NewType("TargetName", str)
 Tag = Literal["all", "legacy", "dist"]
 
 default_cxx_flags = [
-  "-O3",
-  "-DNDEBUG",
-  "--closure=1",
+    "-O3",
+    "-DNDEBUG",
+    "--closure=1",
 ]
 
 default_ld_flags = [
@@ -129,6 +129,8 @@ OBJS = $(addprefix src/, $(SRCS:.cpp=.o)) src/glue.o
 $(EXE).js: $(OBJS)
 	$(CXX) $(CXX_FLAGS) $(LD_FLAGS) $(OBJS) -o $(EXE).js
 
+$(OBJS): Makefile.tmp
+
 %.o: %.cpp
 	$(CXX) $(CXX_FLAGS) -c $< -o $@
 
@@ -158,6 +160,11 @@ def main() -> None:
         "--ld-flags",
         help="em++ linker flags. default: '%(default)s'",
         default=" ".join(default_ld_flags),
+    )
+    parser.add_argument(
+        "--pgo",
+        action="store_true",
+        help="profile guided optimization: build instrumented, collect profile by running bench, rebuild using the profile",
     )
     parser.add_argument(
         "--emcc-version", action="store_true", help="print required emscripten version and exit"
@@ -196,12 +203,12 @@ def main() -> None:
     for name in selected_targets:
         print("")
         print(f"# {name}")
-        build_target(name, args.cxx_flags, args.ld_flags)
+        build_target(name, cxx_flags=args.cxx_flags, ld_flags=args.ld_flags, pgo=args.pgo)
         if args.verify_bench:
             verify_bench(name)
 
 
-def build_target(name: TargetName, cxx_flags: str, ld_flags: str) -> None:
+def build_target(name: TargetName, *, cxx_flags: str, ld_flags: str, pgo: bool) -> None:
     fetch_sources(name)
 
     target_dir = fishes_dir / name
@@ -212,8 +219,46 @@ def build_target(name: TargetName, cxx_flags: str, ld_flags: str) -> None:
         if f not in ignore_sources
     ]
 
-    with open(target_dir / "Makefile.tmp", "w") as f:
-        f.write(makefile(name, sources, cxx_flags, ld_flags))
+    if pgo:
+        cxx_flags = f"{cxx_flags} -fprofile-instr-use={collect_pgo_profile(name, sources, cxx_flags=cxx_flags, ld_flags=ld_flags)}"
+
+    run_make(name, sources, cxx_flags=cxx_flags, ld_flags=ld_flags)
+
+
+def collect_pgo_profile(name: TargetName, sources: list[str], *, cxx_flags: str, ld_flags: str) -> Path:
+    target_dir = fishes_dir / name
+    profile_raw = target_dir / "pgo.profraw"
+    profile_data = target_dir / "pgo.profdata"
+    profile_raw.unlink(missing_ok=True)
+
+    run_make(
+        name,
+        sources,
+        cxx_flags=f"{cxx_flags} -fprofile-instr-generate={profile_raw} --closure=0",
+        ld_flags=f"{ld_flags} -sNODERAWFS",
+    )
+
+    print(f"running instrumented bench to collect pgo profile for {name}")
+    if bench_run(name) is None:
+        print(f"instrumented bench run failed for {name}")
+        sys.exit(1)
+    if not profile_raw.exists() or profile_raw.stat().st_size == 0:
+        print(f"instrumented bench run failed to write {profile_raw}")
+        sys.exit(1)
+
+    llvm_root = Path(subprocess.check_output(["em-config", "LLVM_ROOT"], text=True).strip())
+    llvm_profdata = llvm_root / "llvm-profdata"
+    subprocess.check_call([llvm_profdata, "merge", f"-output={profile_data}", profile_raw])
+    return profile_data
+
+
+def run_make(name: TargetName, sources: list[str], *, cxx_flags: str, ld_flags: str) -> None:
+    target_dir = fishes_dir / name
+    makefile_path = target_dir / "Makefile.tmp"
+
+    contents = makefile(name, sources, cxx_flags, ld_flags)
+    if not makefile_path.exists() or makefile_path.read_text() != contents:
+        makefile_path.write_text(contents)
 
     subprocess.check_call(["make", "-f", "Makefile.tmp", "-j"], cwd=target_dir)
 
@@ -312,6 +357,8 @@ def clean() -> None:
     clean_list = [
         *fishes_dir.glob("**/*.o"),
         *fishes_dir.glob("*/Makefile.tmp"),
+        *fishes_dir.glob("*/pgo.profraw"),
+        *fishes_dir.glob("*/pgo.profdata"),
         *[script_dir / f"{name}.{ext}" for name in targets.keys() for ext in ["js", "worker.js", "wasm", "js.map", "worker.js.map"]],
     ]
 
