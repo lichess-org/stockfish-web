@@ -32,10 +32,18 @@ async function ensureNnue(filepath: string): Promise<Buffer> {
 }
 
 const createStockfish = (await import(`../${process.argv[2] ?? 'sf_18.js'}`)) as {
-  default: () => Promise<StockfishWeb>;
+  default: (init?: { onExit?: (code: number) => void }) => Promise<StockfishWeb>;
 };
 
-const sf = await createStockfish.default();
+const sf = await createStockfish.default({
+  onExit: (code: number) => {
+    process.exitCode = code;
+    rl.off('close', quit);
+    rl.close();
+  },
+});
+
+const quit = () => sf.uci('quit');
 
 for (let index = 0; ; index++) {
   const nnueFilename = sf.getRecommendedNnue(index);
@@ -52,10 +60,11 @@ const rl = readline.createInterface({
 
 rl.on('SIGINT', process.exit);
 
+rl.on('close', quit);
+
 rl.on('line', async line => {
   if (line.startsWith('load ')) sf.setNnueBuffer(await ensureNnue(line.slice(5)), 0);
   else if (line.startsWith('big ')) sf.setNnueBuffer(await ensureNnue(line.slice(4)), 0);
   else if (line.startsWith('small ')) sf.setNnueBuffer(await ensureNnue(line.slice(6)), 1);
-  else if (line === 'exit' || line === 'quit') process.exit();
   else sf.uci(line);
 });
