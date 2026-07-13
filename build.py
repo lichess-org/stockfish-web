@@ -17,10 +17,11 @@ from typing import Iterable, Literal, NewType
 stockfish_repo = "https://github.com/official-stockfish/Stockfish"
 fairy_stockfish_repo = "https://github.com/fairy-stockfish/Fairy-Stockfish"
 
-emcc_version_min = (6, 0, 0)
+emcc_version_min = (5, 0, 7)
 emcc_version_max = (7, 0, 0)
 
 emcc_bad_versions = [
+    (6, 0, 0), # https://github.com/emscripten-core/emscripten/issues/27037
     (6, 0, 1), (6, 0, 2), # https://github.com/emscripten-core/emscripten/pull/27173
 ]
 
