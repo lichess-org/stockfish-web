@@ -1,4 +1,4 @@
-From 3b82a9f5550a2afa43bb97b50e972f900c6799ed Mon Sep 17 00:00:00 2001
+From 5d21249931260383785eb232006cc6a1b7f65312 Mon Sep 17 00:00:00 2001
 From: Niklas Fiekas <niklas.fiekas@backscattering.de>
 Date: Tue, 9 Jun 2026 22:13:56 +0200
 Subject: [PATCH] stockfish-web patch
@@ -6,26 +6,26 @@ Subject: [PATCH] stockfish-web patch
 Co-authored-by: Jonathan Gamble <gamblej@gmail.com>
 ---
  src/engine.h         |  7 +++++++
- src/main.cpp         | 11 ++++++++---
- src/misc.cpp         |  2 ++
- src/nnue/network.cpp |  3 +++
- src/nnue/network.h   |  5 +++--
+ src/main.cpp         |  8 +++++++-
+ src/misc.cpp         |  3 ++-
+ src/nnue/network.cpp | 13 +++++++++++++
+ src/nnue/network.h   |  1 +
  src/timeman.h        |  2 +-
- src/uci.cpp          | 10 +++++++---
+ src/uci.cpp          |  4 ++++
  src/uci.h            |  3 ++-
- 8 files changed, 33 insertions(+), 10 deletions(-)
+ 8 files changed, 37 insertions(+), 4 deletions(-)
 
 diff --git a/src/engine.h b/src/engine.h
-index be9226a7..8c5bddf6 100644
+index 52c14e97..2d91f6ff 100644
 --- a/src/engine.h
 +++ b/src/engine.h
-@@ -91,6 +91,13 @@ class Engine {
-     void                                 load_network(const std::string& file);
-     void save_network(std::pair<std::optional<std::string>, std::string> file);
+@@ -94,6 +94,13 @@ class Engine {
+     void                                 load_network(const std::filesystem::path& file);
+     void save_network(const std::optional<std::filesystem::path>& file);
  
 +    void load_big_network(std::istream& is) {
 +        network.modify_and_replicate(
-+          [this, &is](Eval::NNUE::Network& network_) { network_.load(is); });
++          [this, &is](Eval::NNUE::Network& network_) { network_.load_stream(is, networkFile); });
 +        threads.clear();
 +        threads.ensure_network_replicated();
 +    }
@@ -34,10 +34,10 @@ index be9226a7..8c5bddf6 100644
  
      void trace_eval() const;
 diff --git a/src/main.cpp b/src/main.cpp
-index c386c418..ea9bf686 100644
+index 7e36b23d..fba339a8 100644
 --- a/src/main.cpp
 +++ b/src/main.cpp
-@@ -28,6 +28,8 @@
+@@ -29,6 +29,8 @@
  
  using namespace Stockfish;
  
@@ -46,80 +46,89 @@ index c386c418..ea9bf686 100644
  #ifdef UNIVERSAL_BINARY
  namespace Stockfish {
  
-@@ -43,11 +45,14 @@ int main(int argc, char* argv[]) {
+@@ -44,13 +46,17 @@ int main(int argc, char* argv[]) {
      Attacks::init();
      Position::init();
  
--    auto uci = std::make_unique<UCIEngine>(argc, argv);
-+    uci_global = new UCIEngine(0, nullptr);
+-    auto cli = CommandLine(argc, argv);
++    auto cli = CommandLine(0, {});
+     auto uci = std::make_unique<UCIEngine>(std::move(cli));
  
--    Tune::init(uci->engine_options());
-+    Tune::init(uci_global->engine_options());
- 
--    uci->loop();
-+    uci_global->loop();
++    uci_global = uci.get();
 +
-+    delete uci_global;
-+    uci_global = nullptr;
+     Tune::init(uci->engine_options());
  
+     uci->loop();
+ 
++    uci_global = nullptr;
++
      return 0;
  }
+ 
 diff --git a/src/misc.cpp b/src/misc.cpp
-index 4e7b912a..4216209d 100644
+index 64f67cff..93a45480 100644
 --- a/src/misc.cpp
 +++ b/src/misc.cpp
-@@ -508,6 +508,7 @@ bool is_whitespace(std::string_view s) {
+@@ -571,6 +571,7 @@ bool is_whitespace(std::string_view s) {
  }
  
- std::string CommandLine::get_binary_directory(std::string argv0) {
-+    return "";
-     std::string pathSeparator;
+ fs::path CommandLine::get_binary_directory(fs::path argv0) {
++    return fs::path{};
  
  #ifdef _WIN32
-@@ -542,6 +543,7 @@ std::string CommandLine::get_binary_directory(std::string argv0) {
+     #ifdef _MSC_VER
+@@ -587,7 +588,7 @@ fs::path CommandLine::get_binary_directory(fs::path argv0) {
+     return binaryDirectory;
  }
  
- std::string CommandLine::get_working_directory() {
-+    return "";
-     std::string workingDirectory = "";
-     char        buff[40000];
-     char*       cwd = GETCWD(buff, 40000);
+-fs::path CommandLine::get_working_directory() { return std::filesystem::current_path(); }
++fs::path CommandLine::get_working_directory() { return fs::path{}; }
+ 
+ void set_console_utf8() {
+ #ifdef _WIN32
 diff --git a/src/nnue/network.cpp b/src/nnue/network.cpp
-index 20149c73..42fc7da8 100644
+index 9e939eb9..7a2feb39 100644
 --- a/src/nnue/network.cpp
 +++ b/src/nnue/network.cpp
-@@ -160,6 +160,9 @@ NetworkOutput Network::evaluate(const Position&    pos,
- 
- void Network::verify(std::string                                  evalfilePath,
-                      const std::function<void(std::string_view)>& f) const {
-+
+@@ -160,6 +160,8 @@ NetworkOutput Network::evaluate(const Position&    pos,
+ void Network::verify(const std::function<void(std::string_view)>& f,
+                      const EvalFile&                              evalFile,
+                      fs::path                                     evalfilePath) const {
 +    return; // Yep
 +
      if (evalfilePath.empty())
          evalfilePath = evalFile.defaultName;
  
+@@ -239,6 +241,17 @@ void Network::load_external(const fs::path& dir, const fs::path& evalfilePath, E
+ }
+ 
+ 
++void Network::load_stream(std::istream& stream, EvalFile& evalFile) {
++    auto description = load(stream);
++
++    if (description.has_value())
++    {
++        evalFile.current        = fs::path{};
++        evalFile.netDescription = description.value();
++    }
++}
++
++
+ void Network::load_internal(EvalFile& evalFile) {
+     // C++ way to prepare a buffer for a memory stream
+     class MemoryBuffer: public std::basic_streambuf<char> {
 diff --git a/src/nnue/network.h b/src/nnue/network.h
-index 4a17501f..44f89b66 100644
+index 4bcae527..dd7752f4 100644
 --- a/src/nnue/network.h
 +++ b/src/nnue/network.h
-@@ -73,14 +73,15 @@ class Network {
-                                  AccumulatorStack&  accumulatorStack,
+@@ -79,6 +79,7 @@ class Network {
                                   AccumulatorCaches& cache) const;
  
-+    std::optional<std::string> load(std::istream&);
-+
+     void load_external(const std::filesystem::path&, const std::filesystem::path&, EvalFile&);
++    void load_stream(std::istream&, EvalFile&);
+     void load_internal(EvalFile&);
+ 
     private:
-     void load_user_net(const std::string&, const std::string&);
-     void load_internal();
- 
-     void initialize();
- 
--    bool                       save(std::ostream&, const std::string&, const std::string&) const;
--    std::optional<std::string> load(std::istream&);
-+    bool save(std::ostream&, const std::string&, const std::string&) const;
- 
-     bool read_header(std::istream&, u32*, std::string*) const;
-     bool write_header(std::ostream&, u32, const std::string&) const;
 diff --git a/src/timeman.h b/src/timeman.h
 index 4439f84c..a2aa08e8 100644
 --- a/src/timeman.h
@@ -134,10 +143,10 @@ index 4439f84c..a2aa08e8 100644
      void clear();
      void advance_nodes_time(i64 nodes);
 diff --git a/src/uci.cpp b/src/uci.cpp
-index 39268b05..227a5eaa 100644
+index 2e35fe6d..2d732bde 100644
 --- a/src/uci.cpp
 +++ b/src/uci.cpp
-@@ -39,6 +39,8 @@
+@@ -41,6 +41,8 @@
  #include "types.h"
  #include "ucioption.h"
  
@@ -146,37 +155,18 @@ index 39268b05..227a5eaa 100644
  namespace Stockfish {
  
  constexpr auto BenchmarkCommand = "speedtest";
-@@ -64,8 +66,8 @@ void UCIEngine::print_info_string(std::string_view str) {
- }
- 
- UCIEngine::UCIEngine(int argc, char** argv) :
--    engine(argv[0]),
--    cli(argc, argv) {
-+    engine(),
-+    cli(0, nullptr) {
- 
-     engine.get_options().add_info_listener([](const std::optional<std::string>& str) {
-         if (str.has_value())
-@@ -96,6 +98,8 @@ void UCIEngine::loop() {
+@@ -99,7 +101,9 @@ void UCIEngine::loop() {
              && !getline(std::cin, cmd))  // Wait for an input or an end-of-file (EOF) indication
              cmd = "quit";
  
 +        cmd = js_getline();
+         currentCmd = cmd;
 +
          std::istringstream is(cmd);
  
          token.clear();  // Avoid a stale if getline() returns nothing or a blank line
-@@ -171,7 +175,7 @@ void UCIEngine::loop() {
-             sync_cout << "Unknown command: '" << cmd << "'. Type help for more information."
-                       << sync_endl;
- 
--    } while (token != "quit" && cli.argc == 1);  // The command-line arguments are one-shot
-+    } while (token != "quit");  // The command-line arguments are one-shot
- }
- 
- Search::LimitsType UCIEngine::parse_limits(std::istream& is) {
 diff --git a/src/uci.h b/src/uci.h
-index 6c3186ff..07f638db 100644
+index 4d3c4cbb..c6b77e32 100644
 --- a/src/uci.h
 +++ b/src/uci.h
 @@ -55,8 +55,9 @@ class UCIEngine {
@@ -188,8 +178,8 @@ index 6c3186ff..07f638db 100644
 +
 +   private:
      CommandLine cli;
+     std::string currentCmd;
  
-     static void print_info_string(std::string_view str);
 -- 
-2.54.0
+2.55.0
 
