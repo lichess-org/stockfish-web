@@ -3,7 +3,6 @@
 #include <string>
 
 #include "evaluate.h"
-#include "syzygy/tbprobe.h"
 #include "position.h"
 #include "uci.h"
 #include "nnue/nnue_architecture.h"
