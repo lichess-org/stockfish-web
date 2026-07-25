@@ -10,9 +10,15 @@ Check out https://github.com/nmrugg/stockfish.js for a simpler browser Stockfish
 
 ## Building
 
+`./build.py` downloads sources to the `./fishes` folder, applies diffs from the `./patches` folder,
+and builds targets using local emsdk with a matching version, podman or docker.
+
 ```
 # Example: Clean and make all targets with pgo and final bench signature verification
 ./build.py clean all --pgo --verify-bench
+
+# Example: Clean and make dist targets for web with a preallocated pthread pool size of 8
+./build.py --ld-flags='-sENVIRONMENT=web,worker -sPTHREAD_POOL_SIZE=8' clean dist
 ```
 
 Use `--cxx-flags` to override the default emcc flags (`-O3 -DNDEBUG --closure=1`).
@@ -21,18 +27,7 @@ Use `--ld-flags` to override default linker flags (`--ld-flags='-sENVIRONMENT=we
 
 Check `./build.py --help` for all available targets.
 
-To avoid installing or changing your emscripten version, use `./build-with-docker.sh` or `./build-with-podman.sh`:
-
-```
-# Example: Docker clean and make all targets for node as debug with SAFE_HEAP
-./build-with-docker.sh --cxx-flags='-O0 -g3 -sSAFE_HEAP' --ld-flags='-sENVIRONMENT=node' all clean
-
-# Example: Clean and make dist targets for web with a preallocated pthread pool size of 8
-./build.py --ld-flags='-sENVIRONMENT=web,worker -sPTHREAD_POOL_SIZE=8' clean dist
-```
-
-`./build.py` downloads sources to the `./fishes` folder then applies diffs from the `./patches` folder.
-Edit the Stockfish sources within `./fishes`. Contribute your edits via patch file.
+Edit the Stockfish sources within `./fishes`. Contribute your edits via patch file:
 
 ```
 # Example: Update `sf_18.patch` with your commits
