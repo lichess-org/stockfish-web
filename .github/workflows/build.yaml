@@ -35,18 +35,6 @@ jobs:
       - name: Typecheck build.py
         run: uv run mypy --strict build.py
 
-      - name: Determine emscripten version
-        id: emscripten
-        run: echo "VERSION=$(uv run build.py --emcc-version)" >> "$GITHUB_OUTPUT"
-
-      - name: Setup emscripten
-        uses: mymindstorm/setup-emsdk@v16
-        with:
-          version: ${{ steps.emscripten.outputs.VERSION }}
-
-      - name: Show emcc version
-        run: emcc --version
-
       - name: Setup node (for bench verification)
         uses: actions/setup-node@v7
         with:
