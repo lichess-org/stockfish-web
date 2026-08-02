@@ -457,10 +457,7 @@ def assert_emsdk() -> None:
         sys.exit(1)
 
     if emcc_version in emcc_bad_versions:
-        print(
-            f"\n\ngot emsdk {join_version(emcc_version)}, which is known to be broken (avoid: {', '.join(join_version(v) for v in emcc_bad_versions)})"
-        )
-        print("see emcc_bad_versions links at the top of ./build.py. you have been warned!\n\n")
+        print(f"got emsdk {join_version(emcc_version)}, which is known to be broken (avoid: {', '.join(join_version(v) for v in emcc_bad_versions)})")
 
 
 if __name__ == "__main__":
