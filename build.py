@@ -15,7 +15,7 @@ import threading
 from pathlib import Path
 from typing import Iterable, Literal
 
-recommended_emcc_version = (5, 0, 7)
+recommended_emcc_version = (6, 0, 5)
 
 stockfish_repo = "https://github.com/official-stockfish/Stockfish"
 fairy_stockfish_repo = "https://github.com/fairy-stockfish/Fairy-Stockfish"
