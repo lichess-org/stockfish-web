@@ -35,6 +35,7 @@ default_ld_flags = [
 script_dir = Path(__file__).resolve().parent
 fishes_dir = script_dir / "fishes"
 patches_dir = script_dir / "patches"
+emsdk_cache_dir = script_dir / ".emsdk_cache"
 
 
 @dataclasses.dataclass
@@ -475,13 +476,16 @@ def get_command(name: TargetName, local_emsdk: bool, *args: str) -> list[str]:
         )
         sys.exit(1)
 
+    cache = emsdk_cache_dir / join_version(target.emcc)
+    cache.mkdir(parents=True, exist_ok=True)
+
     image = f"docker.io/emscripten/emsdk:{join_version(target.emcc)}"
     command = [runtime, "run", "--rm"]
     if Path(runtime).name == "docker":
         command += ["-u", f"{os.getuid()}:{os.getgid()}"]
     command += [
         "-v",
-        f"emscripten-cache-{join_version(target.emcc)}:/emsdk/upstream/emscripten/cache",
+        f"{cache}:/emsdk/upstream/emscripten/cache",
         "-v",
         f"{script_dir}:{script_dir}",
         "-w",

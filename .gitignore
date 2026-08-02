@@ -10,6 +10,7 @@
 /__pycache__
 /.venv
 /.mypy_cache
+/.emsdk_cache
 
 .vscode/
 .DS_Store
