@@ -481,6 +481,8 @@ def get_command(name: TargetName, local_emsdk: bool, *args: str) -> list[str]:
         command += ["-u", f"{os.getuid()}:{os.getgid()}"]
     command += [
         "-v",
+        f"emscripten-cache-{join_version(target.emcc)}:/emsdk/upstream/emscripten/cache",
+        "-v",
         f"{script_dir}:{script_dir}",
         "-w",
         str(fishes_dir / name),
