@@ -7,7 +7,7 @@
 #include "uci.h"
 #include "nnue/nnue_architecture.h"
 
-#if defined(STOCKFISH_WEB_FSF_14)
+#ifdef STOCKFISH_WEB_FSF_14
 # include "nnue/evaluate_nnue.h"
   const std::string load_nnue_cmd(Command& cmd) {
     std::istream in(&cmd);
@@ -21,16 +21,10 @@
 
   const std::string load_nnue_cmd(Command& cmd) {
     std::istream in(&cmd);
-    switch (cmd.index) {
-    case 0:
-      uci_global->engine.load_big_network(in);
-      break;
-    case 1:
+    if (cmd.index == 0) uci_global->engine.load_big_network(in);
 # ifdef EvalFileDefaultNameSmall
-      uci_global->engine.load_small_network(in);
+    if (cmd.index == 1) uci_global->engine.load_small_network(in);
 # endif
-      break;
-    }
     return "";
   }
 #endif
@@ -45,19 +39,15 @@ extern "C" {
   }
 
   EMSCRIPTEN_KEEPALIVE const char* getRecommendedNnue(int index) {
-    switch (index) {
-    case 0:
+#ifdef EvalFileDefaultNameSmall
+    if (index == 1) return EvalFileDefaultNameSmall;
+#endif
+    if (index == 0) {
 #if defined(EvalFileDefaultName)
       return EvalFileDefaultName;
 #elif defined(EvalFileDefaultNameBig)
       return EvalFileDefaultNameBig;
 #endif
-      break;
-    case 1:
-#if defined(EvalFileDefaultNameSmall)
-      return EvalFileDefaultNameSmall;
-#endif
-      break;
     }
     return "";
   }

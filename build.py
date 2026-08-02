@@ -2,30 +2,24 @@
 
 import argparse
 import dataclasses
-import subprocess
+import functools
 import glob
 import os
 import os.path
 import re
+import shlex
+import shutil
+import subprocess
 import sys
 import threading
-
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable, Literal, NewType
-
+from typing import Literal
 
 stockfish_repo = "https://github.com/official-stockfish/Stockfish"
 fairy_stockfish_repo = "https://github.com/fairy-stockfish/Fairy-Stockfish"
 
-emcc_version_min = (5, 0, 7)
-emcc_version_max = (7, 0, 0)
-
-emcc_bad_versions = [
-    (6, 0, 0), (6, 0, 1), (6, 0, 2), (6, 0, 3), # https://github.com/emscripten-core/emscripten/issues/27037
-    (6, 0, 1), (6, 0, 2), # https://github.com/emscripten-core/emscripten/pull/27173
-]
-
-TargetName = NewType("TargetName", str)
+TargetName = str
 Tag = Literal["all", "legacy", "dist"]
 
 default_cxx_flags = [
@@ -41,66 +35,71 @@ default_ld_flags = [
 script_dir = Path(__file__).resolve().parent
 fishes_dir = script_dir / "fishes"
 patches_dir = script_dir / "patches"
+emsdk_cache_dir = script_dir / ".emsdk_cache"
 
 
 @dataclasses.dataclass
 class Target:
-    fish: str
     repo: str
     commit: str
     patches: list[str]
     tags: list[Tag]
+    emcc: tuple[int, int, int]
     cxx_flags: list[str] = dataclasses.field(default_factory=list)
+
+    def relaxed_simd(self) -> "Target":
+        return dataclasses.replace(self, cxx_flags=["-mrelaxed-simd", *self.cxx_flags])
 
 
 targets: dict[TargetName, Target] = {
-    TargetName("fsf_14"): Target(
-        fish="fsf_14",
+    "fsf_14": Target(
         repo=fairy_stockfish_repo,
         commit="a621470b91757699f935ba06d5f4bf48a60574b1",
         patches=["fsf_14.patch"],
+        emcc=(5, 0, 7),
         tags=["all", "dist"],
     ),
-    TargetName("sf_18_smallnet"): Target(
-        fish="sf_18_smallnet",
+    "sf_18_smallnet": Target(
         repo=stockfish_repo,
         commit="cb3d4ee9b47d0c5aae855b12379378ea1439675c",
         patches=["sf_18_smallnet.patch"],
+        emcc=(5, 0, 7),
         tags=["all", "dist"],
     ),
-    TargetName("sf_18"): Target(
-        fish="sf_18",
+    "sf_18": Target(
         repo=stockfish_repo,
         commit="cb3d4ee9b47d0c5aae855b12379378ea1439675c",
         patches=["sf_18.patch"],
+        emcc=(5, 0, 7),
         tags=["all", "dist"],
     ),
-    TargetName("sf_dev"): Target(
-        fish="sf_dev",
+    "sf_dev": Target(
         repo=stockfish_repo,
         commit="415ff793a09ec8d029b6253c0eba4c8c106e61e7",
         patches=["sf_dev.patch"],
+        emcc=(5, 0, 7),
         tags=["all", "dist"],
     ),
 }
+targets["sf_18_smallnet_relaxed-simd"] = targets["sf_18_smallnet"].relaxed_simd()
+targets["sf_18_relaxed-simd"] = targets["sf_18"].relaxed_simd()
+targets["sf_dev_relaxed-simd"] = targets["sf_dev"].relaxed_simd()
 
-relaxed_simd_cxx_flags = ["-mrelaxed-simd"]
-targets[TargetName("sf_18_smallnet_relaxed-simd")] = dataclasses.replace(targets[TargetName("sf_18_smallnet")], cxx_flags=relaxed_simd_cxx_flags)
-targets[TargetName("sf_18_relaxed-simd")] = dataclasses.replace(targets[TargetName("sf_18")], cxx_flags=relaxed_simd_cxx_flags)
-targets[TargetName("sf_dev_relaxed-simd")] = dataclasses.replace(targets[TargetName("sf_dev")], cxx_flags=relaxed_simd_cxx_flags)
-
-default_target = TargetName("sf_18_smallnet")
+default_target = "all"
 
 ignore_sources = [
     os.path.join("universal", "entry_arm64.cpp"),
     os.path.join("universal", "entry_x86.cpp"),
+    os.path.join("universal", "entry_riscv64.cpp"),
     os.path.join("universal", "nnue_embed.cpp"),
     "pyffish.cpp",
     "ffishjs.cpp",
 ]
 
 
-def makefile(name: TargetName, sources: list[str], cxx_flags: str, ld_flags: str) -> str:
+def makefile(
+    name: TargetName, sources: list[str], cxx_flags: str, ld_flags: str
+) -> str:
     target = targets[name]
 
     all_cxx_flags = " ".join([cxx_flags.strip(), *target.cxx_flags])
@@ -115,7 +114,7 @@ EXE = {name}
 CXX_FLAGS = {all_cxx_flags} -Isrc -pthread -msimd128 -mavx -flto -fno-exceptions \\
 	-DUSE_POPCNT -DUSE_SSE2 -DUSE_SSSE3 -DUSE_SSE41 -DNO_PREFETCH \\
 	-DNNUE_EMBEDDING_OFF -DNO_TABLEBASES \\
-	-DSTOCKFISH_WEB_{target.fish.upper()}
+	-DSTOCKFISH_WEB_{name.upper().replace("-", "_")}
 
 LD_FLAGS = {ld_flags} \\
 	--pre-js=../../src/initModule.js -sEXIT_RUNTIME -sEXPORT_ES6 -sEXPORT_NAME={mod_name(name)} \\
@@ -168,23 +167,27 @@ def main() -> None:
         help="profile guided optimization: build instrumented, collect profile by running bench, rebuild using the profile",
     )
     parser.add_argument(
-        "--emcc-version", action="store_true", help="print required emscripten version and exit"
+        "--verify-bench",
+        action="store_true",
+        help="after building verify bench against commit history",
     )
     parser.add_argument(
-        "--verify-bench", action="store_true", help="after building verify bench against commit history"
+        "--local-emsdk",
+        action="store_true",
+        help="force using local emsdk, even if it does not match the pinned version",
     )
     parser.add_argument(
         "targets",
         nargs="*",
-        choices=["clean", *set(tag for info in targets.values() for tag in info.tags), *targets.keys()],
-        default=default_target,
+        choices=[
+            "clean",
+            *{tag for info in targets.values() for tag in info.tags},
+            *targets.keys(),
+        ],
+        default=[default_target],
     )
 
     args = parser.parse_args()
-
-    if args.emcc_version:
-        print(join_version(emcc_version_min))
-        sys.exit(0)
 
     if "clean" in args.targets:
         clean()
@@ -196,20 +199,35 @@ def main() -> None:
     ]
 
     if selected_targets:
-        assert_emsdk()
         print(f"selected targets: {', '.join(selected_targets)}")
         print(f"cxx flags: {args.cxx_flags}")
         print(f"ld flags: {args.ld_flags}")
 
     for name in selected_targets:
-        print("")
+        print()
         print(f"# {name}")
-        build_target(name, cxx_flags=args.cxx_flags, ld_flags=args.ld_flags, pgo=args.pgo)
+        command = get_command(name, args.local_emsdk, "em++")
+        build_target(
+            name,
+            local_emsdk=args.local_emsdk,
+            cxx_flags=args.cxx_flags,
+            ld_flags=args.ld_flags,
+            pgo=args.pgo,
+            command=command,
+        )
         if args.verify_bench:
             verify_bench(name)
 
 
-def build_target(name: TargetName, *, cxx_flags: str, ld_flags: str, pgo: bool) -> None:
+def build_target(
+    name: TargetName,
+    *,
+    local_emsdk: bool,
+    cxx_flags: str,
+    ld_flags: str,
+    pgo: bool,
+    command: list[str],
+) -> None:
     fetch_sources(name)
 
     target_dir = fishes_dir / name
@@ -221,12 +239,20 @@ def build_target(name: TargetName, *, cxx_flags: str, ld_flags: str, pgo: bool) 
     ]
 
     if pgo:
-        cxx_flags = f"{cxx_flags} -fprofile-instr-use={collect_pgo_profile(name, sources, cxx_flags=cxx_flags, ld_flags=ld_flags)}"
+        cxx_flags = f"{cxx_flags} -fprofile-instr-use={collect_pgo_profile(name, sources, local_emsdk=local_emsdk, cxx_flags=cxx_flags, ld_flags=ld_flags, command=command)}"
 
-    run_make(name, sources, cxx_flags=cxx_flags, ld_flags=ld_flags)
+    run_make(name, sources, cxx_flags=cxx_flags, ld_flags=ld_flags, command=command)
 
 
-def collect_pgo_profile(name: TargetName, sources: list[str], *, cxx_flags: str, ld_flags: str) -> Path:
+def collect_pgo_profile(
+    name: TargetName,
+    sources: list[str],
+    *,
+    local_emsdk: bool,
+    cxx_flags: str,
+    ld_flags: str,
+    command: list[str],
+) -> Path:
     target_dir = fishes_dir / name
     profile_raw = target_dir / "pgo.profraw"
     profile_data = target_dir / "pgo.profdata"
@@ -237,6 +263,7 @@ def collect_pgo_profile(name: TargetName, sources: list[str], *, cxx_flags: str,
         sources,
         cxx_flags=f"{cxx_flags} -fprofile-instr-generate={profile_raw} --closure=0",
         ld_flags=f"{ld_flags} -sNODERAWFS",
+        command=command,
     )
 
     print(f"running instrumented bench to collect pgo profile for {name}")
@@ -247,13 +274,33 @@ def collect_pgo_profile(name: TargetName, sources: list[str], *, cxx_flags: str,
         print(f"instrumented bench run failed to write {profile_raw}")
         sys.exit(1)
 
-    llvm_root = Path(subprocess.check_output(["em-config", "LLVM_ROOT"], text=True).strip())
+    llvm_root = Path(
+        subprocess.check_output(
+            get_command(name, local_emsdk, "em-config", "LLVM_ROOT"), text=True
+        ).strip()
+    )
     llvm_profdata = llvm_root / "llvm-profdata"
-    subprocess.check_call([llvm_profdata, "merge", f"-output={profile_data}", profile_raw])
+    subprocess.check_call(
+        get_command(
+            name,
+            local_emsdk,
+            str(llvm_profdata),
+            "merge",
+            f"-output={profile_data}",
+            str(profile_raw),
+        )
+    )
     return profile_data
 
 
-def run_make(name: TargetName, sources: list[str], *, cxx_flags: str, ld_flags: str) -> None:
+def run_make(
+    name: TargetName,
+    sources: list[str],
+    *,
+    cxx_flags: str,
+    ld_flags: str,
+    command: list[str],
+) -> None:
     target_dir = fishes_dir / name
     makefile_path = target_dir / "Makefile.tmp"
 
@@ -261,7 +308,9 @@ def run_make(name: TargetName, sources: list[str], *, cxx_flags: str, ld_flags: 
     if not makefile_path.exists() or makefile_path.read_text() != contents:
         makefile_path.write_text(contents)
 
-    subprocess.check_call(["make", "-f", "Makefile.tmp", "-j"], cwd=target_dir)
+    make_command = ["make", "-f", "Makefile.tmp", "-j"]
+    make_command.append(f"CXX={shlex.join(command)}")
+    subprocess.check_call(make_command, cwd=target_dir)
 
     for asset in [f"{name}.js", f"{name}.wasm"]:
         (target_dir / asset).replace(script_dir / asset)
@@ -279,7 +328,9 @@ def verify_bench(name: TargetName) -> None:
         print(f"no bench signature obtained for {name} (crash or timeout?)")
         sys.exit(1)
     if signature != reference:
-        print(f"bench signature mismatch for {name}: reference {reference}, obtained {signature}")
+        print(
+            f"bench signature mismatch for {name}: reference {reference}, obtained {signature}"
+        )
         sys.exit(1)
     print(f"bench signature ok for {name}: {signature}")
 
@@ -288,8 +339,16 @@ def bench_reference(name: TargetName) -> str | None:
     bench_re = re.compile(r"^[ \t]*[Bb]ench[ :]+([0-9]+)[ \t]*$", re.MULTILINE)
 
     body = subprocess.check_output(
-        ["git", "log", "--max-count=1", "--format=%B",
-         "--extended-regexp", "--grep", r"^[[:space:]]*[Bb]ench[ :]+[0-9]+[[:space:]]*$", "HEAD"],
+        [
+            "git",
+            "log",
+            "--max-count=1",
+            "--format=%B",
+            "--extended-regexp",
+            "--grep",
+            r"^[[:space:]]*[Bb]ench[ :]+[0-9]+[[:space:]]*$",
+            "HEAD",
+        ],
         cwd=fishes_dir / name,
         text=True,
     )
@@ -345,13 +404,27 @@ def fetch_sources(name: TargetName) -> None:
         checkout_dir.mkdir(parents=True, exist_ok=False)
     except FileExistsError:
         print(f"skipping clone and patch for {name} (already exists)")
-        subprocess.check_call(["git", "tag", "-f", "stockfish-web/base", target.commit], env=env, cwd=checkout_dir)
+        subprocess.check_call(
+            ["git", "tag", "-f", "stockfish-web/base", target.commit],
+            env=env,
+            cwd=checkout_dir,
+        )
     else:
-        subprocess.check_call(["git", "clone", target.repo, name], env=env, cwd=fishes_dir)
-        subprocess.check_call(["git", "checkout", target.commit], env=env, cwd=checkout_dir)
-        subprocess.check_call(["git", "tag", "-f", "stockfish-web/base", target.commit], env=env, cwd=checkout_dir)
+        subprocess.check_call(
+            ["git", "clone", target.repo, name], env=env, cwd=fishes_dir
+        )
+        subprocess.check_call(
+            ["git", "checkout", target.commit], env=env, cwd=checkout_dir
+        )
+        subprocess.check_call(
+            ["git", "tag", "-f", "stockfish-web/base", target.commit],
+            env=env,
+            cwd=checkout_dir,
+        )
         for patch in target.patches:
-            subprocess.check_call(["git", "am", patches_dir / patch], env=env, cwd=checkout_dir)
+            subprocess.check_call(
+                ["git", "am", patches_dir / patch], env=env, cwd=checkout_dir
+            )
 
 
 def clean() -> None:
@@ -360,32 +433,67 @@ def clean() -> None:
         *fishes_dir.glob("*/Makefile.tmp"),
         *fishes_dir.glob("*/pgo.profraw"),
         *fishes_dir.glob("*/pgo.profdata"),
-        *[script_dir / f"{name}.{ext}" for name in targets.keys() for ext in ["js", "worker.js", "wasm", "js.map", "worker.js.map"]],
+        *[
+            script_dir / f"{name}.{ext}"
+            for name in targets
+            for ext in ["js", "worker.js", "wasm", "js.map", "worker.js.map"]
+        ],
     ]
 
     for path in clean_list:
         path.unlink(missing_ok=True)
 
 
-def assert_emsdk() -> None:
+@functools.cache
+def which_local_emsdk_version() -> tuple[int, int, int] | None:
     try:
         stdout = subprocess.check_output(["emcc", "--version"], text=True)
-    except FileNotFoundError:
-        print("emcc not installed or not found in the system path")
-        sys.exit(1)
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return None
 
     version_match = re.search(r"([\d]+)\.([\d]+)\.([\d]+)", stdout)
-    if not version_match:
-        print("could not determine emcc version")
+    if version_match is None:
+        return None
+    major, minor, patch = map(int, version_match.groups())
+    return major, minor, patch
+
+
+@functools.cache
+def which_runtime() -> str | None:
+    return shutil.which("podman") or shutil.which("docker")
+
+
+def get_command(name: TargetName, local_emsdk: bool, *args: str) -> list[str]:
+    target = targets[name]
+    local_emsdk_version = which_local_emsdk_version()
+    if local_emsdk or local_emsdk_version == target.emcc:
+        return [*args]
+
+    runtime = which_runtime()
+    if runtime is None:
+        print(
+            f"either emsdk {join_version(target.emcc)} (or any with --local-emsdk), podman, or docker is needed to build {name}"
+        )
         sys.exit(1)
 
-    emcc_version = tuple(int(g) for g in version_match.groups())
-    if not (emcc_version_min <= emcc_version < emcc_version_max):
-        print(f"got emsdk {join_version(emcc_version)}, required >={join_version(emcc_version_min)},<{join_version(emcc_version_max)}")
-        sys.exit(1)
-    if emcc_version in emcc_bad_versions:
-        print(f"got emsdk {join_version(emcc_version)}, which is known to be broken (avoid: {', '.join(join_version(v) for v in emcc_bad_versions)})")
-        sys.exit(1)
+    cache = emsdk_cache_dir / join_version(target.emcc)
+    cache.mkdir(parents=True, exist_ok=True)
+
+    image = f"docker.io/emscripten/emsdk:{join_version(target.emcc)}"
+    command = [runtime, "run", "--rm"]
+    if Path(runtime).name == "docker":
+        command += ["-u", f"{os.getuid()}:{os.getgid()}"]
+    command += [
+        "-v",
+        f"{cache}:/emsdk/upstream/emscripten/cache",
+        "-v",
+        f"{script_dir}:{script_dir}",
+        "-w",
+        str(fishes_dir / name),
+        image,
+        *args,
+    ]
+    return command
 
 
 if __name__ == "__main__":
