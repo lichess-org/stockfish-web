@@ -75,7 +75,7 @@ targets: dict[TargetName, Target] = {
     ),
     "sf_dev": Target(
         repo=stockfish_repo,
-        commit="415ff793a09ec8d029b6253c0eba4c8c106e61e7",
+        commit="924d29d3cab85f45a877a5da0eeeb73a52cb4b62",
         patches=["sf_dev.patch"],
         emcc=(5, 0, 7),
         tags=["all", "dist"],
@@ -89,6 +89,7 @@ default_target = "all"
 
 ignore_sources = [
     os.path.join("universal", "entry_arm64.cpp"),
+    os.path.join("universal", "entry_riscv64.cpp"),
     os.path.join("universal", "entry_x86.cpp"),
     os.path.join("universal", "entry_riscv64.cpp"),
     os.path.join("universal", "nnue_embed.cpp"),
