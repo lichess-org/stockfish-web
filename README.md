@@ -63,12 +63,12 @@ uci
 - big nnue: [nn-c288c895ea92.nnue](https://tests.stockfishchess.org/api/nn/nn-c288c895ea92.nnue)
 - small nnue: [nn-37f18f62d772.nnue](https://tests.stockfishchess.org/api/nn/nn-37f18f62d772.nnue)
 
-### sf_dev (Stockfish dev-20260609-415ff793)
+### sf_dev (Stockfish dev-20260829-8bc5caa2)
 
 - repo: https://github.com/official-stockfish/Stockfish
-- base: [415ff793](https://github.com/official-stockfish/Stockfish/commit/415ff793a09ec8d029b6253c0eba4c8c106e61e7)
-- tag: stockfish-dev-20260609-415ff793
-- nnue: [nn-71d6d32cb962.nnue](https://tests.stockfishchess.org/api/nn/nn-71d6d32cb962.nnue)
+- base: [8bc5caa2](https://github.com/official-stockfish/Stockfish/commit/8bc5caa2e4b1d4c189b1428e93158b10d3edb0b6)
+- tag: stockfish-dev-20260829-8bc5caa2
+- nnue: [nn-1a298aa575a0.nnue](https://tests.stockfishchess.org/api/nn/nn-1a298aa575a0.nnue)
 
 ### fsf_14 (Fairy-Stockfish 14)
 
