@@ -63,6 +63,13 @@ uci
 - big nnue: [nn-c288c895ea92.nnue](https://tests.stockfishchess.org/api/nn/nn-c288c895ea92.nnue)
 - small nnue: [nn-37f18f62d772.nnue](https://tests.stockfishchess.org/api/nn/nn-37f18f62d772.nnue)
 
+### sf_dev_smallnet (Stockfish dev-20260801-c5aef2bf with sscg13/size-optimize-nnue)
+
+- repo: https://github.com/official-stockfish/Stockfish
+- base: [c5aef2bf](https://github.com/official-stockfish/Stockfish/commit/c5aef2bf1f77d94a3dd476f276af68fd71a0ac07)
+- tag: stockfish-dev-20260801-c5aef2bf (patches include sscg13/size-optimize-nnue)
+- nnue: [nn-61e7af4bb97d.nnue](https://tests.stockfishchess.org/api/nn/nn-61e7af4bb97d.nnue)
+
 ### sf_dev (Stockfish dev-20260829-8bc5caa2)
 
 - repo: https://github.com/official-stockfish/Stockfish

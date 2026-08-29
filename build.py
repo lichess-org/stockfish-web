@@ -73,6 +73,17 @@ targets: dict[TargetName, Target] = {
         emcc=(5, 0, 7),
         tags=["all", "dist"],
     ),
+    "sf_dev_smallnet": Target(
+        repo=stockfish_repo,
+        commit="c5aef2bf1f77d94a3dd476f276af68fd71a0ac07",
+        patches=[
+            "sf_dev_smallnet/0001-simple-mirrored-piece-square-features.patch",
+            "sf_dev_smallnet/0002-net.patch",
+            "sf_dev_smallnet/0003-stockfish-web-patch.patch",
+        ],
+        emcc=(5, 0, 7),
+        tags=["all", "dist"],
+    ),
     "sf_dev": Target(
         repo=stockfish_repo,
         commit="8bc5caa2e4b1d4c189b1428e93158b10d3edb0b6",
@@ -83,6 +94,7 @@ targets: dict[TargetName, Target] = {
 }
 targets["sf_18_smallnet_relaxed-simd"] = targets["sf_18_smallnet"].relaxed_simd()
 targets["sf_18_relaxed-simd"] = targets["sf_18"].relaxed_simd()
+targets["sf_dev_smallnet_relaxed-simd"] = targets["sf_dev_smallnet"].relaxed_simd()
 targets["sf_dev_relaxed-simd"] = targets["sf_dev"].relaxed_simd()
 
 default_target = "all"

@@ -1,0 +1,26 @@
+From 449b6d94903697d30b59f7e8167134b04991386c Mon Sep 17 00:00:00 2001
+From: sscg13 <iamdumbybear1@gmail.com>
+Date: Sun, 2 Aug 2026 21:28:56 -0700
+Subject: [PATCH 2/3] net
+
+bench: 3288482
+---
+ src/evaluate.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/evaluate.h b/src/evaluate.h
+index cc1753d8..35c70ee0 100644
+--- a/src/evaluate.h
++++ b/src/evaluate.h
+@@ -33,7 +33,7 @@ namespace Eval {
+ // for the build process (profile-build and fishtest) to work. Do not change the
+ // name of the macro or the location where this macro is defined, as it is used
+ // in the Makefile/Fishtest.
+-#define EvalFileDefaultName "nn-ab28990d4ea3.nnue"
++#define EvalFileDefaultName "nn-61e7af4bb97d.nnue"
+ 
+ namespace NNUE {
+ class Network;
+-- 
+2.55.0
+

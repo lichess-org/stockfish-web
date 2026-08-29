@@ -1,0 +1,176 @@
+From d9601465e4e37cc34c37b7f4e28d3461bb4ad584 Mon Sep 17 00:00:00 2001
+From: Niklas Fiekas <niklas.fiekas@backscattering.de>
+Date: Tue, 9 Jun 2026 22:13:56 +0200
+Subject: [PATCH 3/3] stockfish-web patch
+
+Co-authored-by: Jonathan Gamble <gamblej@gmail.com>
+---
+ src/engine.h         |  7 +++++++
+ src/main.cpp         | 13 +++++++++----
+ src/misc.cpp         |  3 ++-
+ src/nnue/network.cpp |  2 ++
+ src/nnue/network.h   |  2 +-
+ src/timeman.h        |  2 +-
+ src/uci.cpp          |  7 +++----
+ src/uci.h            |  3 ++-
+ 8 files changed, 27 insertions(+), 12 deletions(-)
+
+diff --git a/src/engine.h b/src/engine.h
+index 0184965e..f04296e4 100644
+--- a/src/engine.h
++++ b/src/engine.h
+@@ -95,6 +95,13 @@ class Engine {
+     void                                 load_network(const std::filesystem::path& file);
+     void save_network(const std::optional<std::filesystem::path>& file);
+ 
++    void load_big_network(std::istream& is) {
++        network.modify_and_replicate(
++          [this, &is](Eval::NNUE::Network& network_) { network_.load(is); });
++        threads.clear();
++        threads.ensure_network_replicated();
++    }
++
+     // utility functions
+ 
+     void trace_eval() const;
+diff --git a/src/main.cpp b/src/main.cpp
+index 304b2be0..9c65f29b 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -28,6 +28,8 @@
+ 
+ using namespace Stockfish;
+ 
++UCIEngine* uci_global;
++
+ #ifdef UNIVERSAL_BINARY
+ namespace Stockfish {
+ 
+@@ -42,12 +44,15 @@ int main(int argc, char* argv[]) {
+     Attacks::init();
+     Position::init();
+ 
+-    auto cli = CommandLine(argc, argv);
+-    auto uci = std::make_unique<UCIEngine>(std::move(cli));
++    auto cli = CommandLine(0, nullptr);
++    uci_global = new UCIEngine(std::move(cli));
+ 
+-    Tune::init(uci->engine_options());
++    Tune::init(uci_global->engine_options());
+ 
+-    uci->loop();
++    uci_global->loop();
++
++    delete uci_global;
++    uci_global = nullptr;
+ 
+     return 0;
+ }
+diff --git a/src/misc.cpp b/src/misc.cpp
+index dad0c212..16e4f449 100644
+--- a/src/misc.cpp
++++ b/src/misc.cpp
+@@ -576,6 +576,7 @@ bool is_whitespace(std::string_view s) {
+ }
+ 
+ fs::path CommandLine::get_binary_directory(fs::path argv0) {
++    return {};
+ 
+ #ifdef _WIN32
+     // Prefer the executable path reported by Windows. Unlike _get_wpgmptr,
+@@ -595,7 +596,7 @@ fs::path CommandLine::get_binary_directory(fs::path argv0) {
+     return binaryDirectory;
+ }
+ 
+-fs::path CommandLine::get_working_directory() { return std::filesystem::current_path(); }
++fs::path CommandLine::get_working_directory() { return {}; }
+ 
+ void set_console_utf8() {
+ #ifdef _WIN32
+diff --git a/src/nnue/network.cpp b/src/nnue/network.cpp
+index 9e939eb9..f4411b58 100644
+--- a/src/nnue/network.cpp
++++ b/src/nnue/network.cpp
+@@ -160,6 +160,8 @@ NetworkOutput Network::evaluate(const Position&    pos,
+ void Network::verify(const std::function<void(std::string_view)>& f,
+                      const EvalFile&                              evalFile,
+                      fs::path                                     evalfilePath) const {
++    return; // Yep
++
+     if (evalfilePath.empty())
+         evalfilePath = evalFile.defaultName;
+ 
+diff --git a/src/nnue/network.h b/src/nnue/network.h
+index 4bcae527..cdde7a7f 100644
+--- a/src/nnue/network.h
++++ b/src/nnue/network.h
+@@ -80,12 +80,12 @@ class Network {
+ 
+     void load_external(const std::filesystem::path&, const std::filesystem::path&, EvalFile&);
+     void load_internal(EvalFile&);
++    std::optional<std::string> load(std::istream&);
+ 
+    private:
+     void initialize();
+ 
+     bool                       save(std::ostream&, const std::string&) const;
+-    std::optional<std::string> load(std::istream&);
+ 
+     bool read_header(std::istream&, u32*, std::string*) const;
+     bool write_header(std::ostream&, u32, const std::string&) const;
+diff --git a/src/timeman.h b/src/timeman.h
+index 4439f84c..a2aa08e8 100644
+--- a/src/timeman.h
++++ b/src/timeman.h
+@@ -47,7 +47,7 @@ class TimeManagement {
+     TimePoint elapsed(FUNC nodes) const {
+         return useNodesTime ? TimePoint(nodes()) : elapsed_time();
+     }
+-    TimePoint elapsed_time() const { return now() - startTime; };
++    TimePoint elapsed_time() const { return std::max(now() - startTime, TimePoint(1)); };
+ 
+     void clear();
+     void advance_nodes_time(i64 nodes);
+diff --git a/src/uci.cpp b/src/uci.cpp
+index f908dbe8..b36aa79d 100644
+--- a/src/uci.cpp
++++ b/src/uci.cpp
+@@ -42,6 +42,8 @@
+ #include "types.h"
+ #include "ucioption.h"
+ 
++std::string js_getline();  // src/glue.cpp
++
+ namespace Stockfish {
+ 
+ using Time = std::chrono::steady_clock;
+@@ -100,10 +102,7 @@ void UCIEngine::loop() {
+ 
+     do
+     {
+-        if (cli.argc == 1
+-            && !getline(std::cin, cmd))  // Wait for an input or an end-of-file (EOF) indication
+-            cmd = "quit";
+-
++        cmd = js_getline();
+         currentCmd = cmd;
+         std::istringstream is(cmd);
+ 
+diff --git a/src/uci.h b/src/uci.h
+index 4d3c4cbb..c6b77e32 100644
+--- a/src/uci.h
++++ b/src/uci.h
+@@ -55,8 +55,9 @@ class UCIEngine {
+ 
+     auto& engine_options() { return engine.get_options(); }
+ 
+-   private:
+     Engine      engine;
++
++   private:
+     CommandLine cli;
+     std::string currentCmd;
+ 
+-- 
+2.55.0
+
