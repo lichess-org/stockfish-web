@@ -1,4 +1,4 @@
-From bc63f0fcb7be4f69dfd00245602bcccc45e689f4 Mon Sep 17 00:00:00 2001
+From b78677a5b99cbc16f14d2ff2f9b3e7858698035c Mon Sep 17 00:00:00 2001
 From: Niklas Fiekas <niklas.fiekas@backscattering.de>
 Date: Tue, 9 Jun 2026 22:13:56 +0200
 Subject: [PATCH] stockfish-web patch
@@ -132,7 +132,7 @@ index 437f6bbc..42320abc 100644
      void clear();
      void advance_nodes_time(i64 nodes);
 diff --git a/src/uci.cpp b/src/uci.cpp
-index f908dbe8..b36aa79d 100644
+index 5dd2d038..b888367a 100644
 --- a/src/uci.cpp
 +++ b/src/uci.cpp
 @@ -42,6 +42,8 @@

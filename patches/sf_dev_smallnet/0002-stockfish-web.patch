@@ -1,7 +1,7 @@
-From d9601465e4e37cc34c37b7f4e28d3461bb4ad584 Mon Sep 17 00:00:00 2001
+From 234fc6cff45523595b24e39e784783448f226efa Mon Sep 17 00:00:00 2001
 From: Niklas Fiekas <niklas.fiekas@backscattering.de>
 Date: Tue, 9 Jun 2026 22:13:56 +0200
-Subject: [PATCH 3/3] stockfish-web patch
+Subject: [PATCH 2/2] stockfish-web patch
 
 Co-authored-by: Jonathan Gamble <gamblej@gmail.com>
 ---
@@ -16,10 +16,10 @@ Co-authored-by: Jonathan Gamble <gamblej@gmail.com>
  8 files changed, 27 insertions(+), 12 deletions(-)
 
 diff --git a/src/engine.h b/src/engine.h
-index 0184965e..f04296e4 100644
+index c4c05782..476eb1b2 100644
 --- a/src/engine.h
 +++ b/src/engine.h
-@@ -95,6 +95,13 @@ class Engine {
+@@ -99,6 +99,13 @@ class Engine {
      void                                 load_network(const std::filesystem::path& file);
      void save_network(const std::optional<std::filesystem::path>& file);
  
@@ -67,10 +67,10 @@ index 304b2be0..9c65f29b 100644
      return 0;
  }
 diff --git a/src/misc.cpp b/src/misc.cpp
-index dad0c212..16e4f449 100644
+index d6665cbe..fb8e1501 100644
 --- a/src/misc.cpp
 +++ b/src/misc.cpp
-@@ -576,6 +576,7 @@ bool is_whitespace(std::string_view s) {
+@@ -587,6 +587,7 @@ bool is_whitespace(std::string_view s) {
  }
  
  fs::path CommandLine::get_binary_directory(fs::path argv0) {
@@ -78,7 +78,7 @@ index dad0c212..16e4f449 100644
  
  #ifdef _WIN32
      // Prefer the executable path reported by Windows. Unlike _get_wpgmptr,
-@@ -595,7 +596,7 @@ fs::path CommandLine::get_binary_directory(fs::path argv0) {
+@@ -606,7 +607,7 @@ fs::path CommandLine::get_binary_directory(fs::path argv0) {
      return binaryDirectory;
  }
  
@@ -88,10 +88,10 @@ index dad0c212..16e4f449 100644
  void set_console_utf8() {
  #ifdef _WIN32
 diff --git a/src/nnue/network.cpp b/src/nnue/network.cpp
-index 9e939eb9..f4411b58 100644
+index e6f166d4..cae4c041 100644
 --- a/src/nnue/network.cpp
 +++ b/src/nnue/network.cpp
-@@ -160,6 +160,8 @@ NetworkOutput Network::evaluate(const Position&    pos,
+@@ -161,6 +161,8 @@ NetworkOutput Network::evaluate(const Position&    pos,
  void Network::verify(const std::function<void(std::string_view)>& f,
                       const EvalFile&                              evalFile,
                       fs::path                                     evalfilePath) const {
@@ -119,10 +119,10 @@ index 4bcae527..cdde7a7f 100644
      bool read_header(std::istream&, u32*, std::string*) const;
      bool write_header(std::ostream&, u32, const std::string&) const;
 diff --git a/src/timeman.h b/src/timeman.h
-index 4439f84c..a2aa08e8 100644
+index 437f6bbc..42320abc 100644
 --- a/src/timeman.h
 +++ b/src/timeman.h
-@@ -47,7 +47,7 @@ class TimeManagement {
+@@ -49,7 +49,7 @@ class TimeManagement {
      TimePoint elapsed(FUNC nodes) const {
          return useNodesTime ? TimePoint(nodes()) : elapsed_time();
      }
@@ -132,7 +132,7 @@ index 4439f84c..a2aa08e8 100644
      void clear();
      void advance_nodes_time(i64 nodes);
 diff --git a/src/uci.cpp b/src/uci.cpp
-index f908dbe8..b36aa79d 100644
+index 5dd2d038..b888367a 100644
 --- a/src/uci.cpp
 +++ b/src/uci.cpp
 @@ -42,6 +42,8 @@

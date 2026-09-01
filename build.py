@@ -75,18 +75,17 @@ targets: dict[TargetName, Target] = {
     ),
     "sf_dev_smallnet": Target(
         repo=stockfish_repo,
-        commit="c5aef2bf1f77d94a3dd476f276af68fd71a0ac07",
+        commit="3f6f417b87c0e80ee30914b6b539b4ab7d3b2a5b",
         patches=[
             "sf_dev_smallnet/0001-simple-mirrored-piece-square-features.patch",
-            "sf_dev_smallnet/0002-net.patch",
-            "sf_dev_smallnet/0003-stockfish-web-patch.patch",
+            "sf_dev_smallnet/0002-stockfish-web.patch",
         ],
         emcc=(5, 0, 7),
         tags=["all", "dist"],
     ),
     "sf_dev": Target(
         repo=stockfish_repo,
-        commit="8bc5caa2e4b1d4c189b1428e93158b10d3edb0b6",
+        commit="3f6f417b87c0e80ee30914b6b539b4ab7d3b2a5b",
         patches=["sf_dev.patch"],
         emcc=(5, 0, 7),
         tags=["all", "dist"],
