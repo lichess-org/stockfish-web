@@ -5,7 +5,7 @@ requires-python = ">=3.13"
 
 [dependency-groups]
 dev = [
-  "mypy==2.3.0",
+  "mypy==2.3.1",
 ]
 
 [tool.uv]
