@@ -2,7 +2,10 @@
   "name": "@lichess-org/stockfish-web",
   "version": "0.4.1",
   "//": "version is managed by the build system",
-  "repository": "github:lichess-org/stockfish-web",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lichess-org/stockfish-web.git"
+  },
   "author": "T-bone Duplexus",
   "license": "AGPL-3.0-or-later",
   "type": "module",
