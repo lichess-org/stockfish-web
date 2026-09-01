@@ -1,0 +1,2433 @@
+From 81348d3fb4f68bda5c442e7459de78ab00acbc55 Mon Sep 17 00:00:00 2001
+From: sscg13 <iamdumbybear1@gmail.com>
+Date: Fri, 3 Jul 2026 17:30:38 -0700
+Subject: [PATCH 1/2] simple mirrored piece square features
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+20000 games - size-optimize-nnue vs sf18-15mb:
+
+https://tests.stockfishchess.org/tests/view/6a70197b2cf557d58a2e196b
+Elo: 9.75 ± 2.7 (95%) LOS: 100.0%
+Total: 20000 W: 5721 L: 5160 D: 9119
+Ptnml(0-2): 198, 2179, 4680, 2750, 193
+nElo: 17.15 ± 4.8 (95%) PairsRatio: 1.24
+
+Rebased onto stockfish-dev-20260829-8bc5caa2 by Niklas Fiekas
+<niklas.fiekas@backscattering.de> assisted by claude-opus-5[1m].
+Passed local non-regression STC against original size-optimize-nnue
+branch.
+
+Results of rebased vs orig (10+0.1, 1t, 16MB, UHO_Lichess_4852_v1.epd):
+Elo: 0.58 +/- 1.10, nElo: 1.17 +/- 2.24
+LOS: 84.76 %, DrawRatio: 52.92 %, PairsRatio: 1.01
+Games: 92426, Wins: 23267, Losses: 23114, Draws: 46045, Points: 46289.5 (50.08 %)
+Ptnml(0-2): [45, 10791, 24454, 10812, 111], WL/DD Ratio: 1.00
+LLR: 2.94 (100.0%) (-2.94, 2.94) [-1.75, 0.25]
+
+Rebased again onto stockfish-dev-20260901-3f6f417b.
+
+Bench: 2793281
+---
+ src/Makefile                                  |   6 +-
+ src/attacks.h                                 |  12 -
+ src/evaluate.h                                |   2 +-
+ src/nnue/features/full_threats.cpp            | 324 ---------------
+ src/nnue/features/full_threats.h              | 100 -----
+ src/nnue/features/half_ka_v2_hm.h             | 127 ------
+ .../features/{half_ka_v2_hm.cpp => p_hm.cpp}  |  46 +--
+ src/nnue/features/p_hm.h                      | 103 +++++
+ src/nnue/features/pp_3wide.cpp                | 238 -----------
+ src/nnue/features/pp_3wide.h                  |  71 ----
+ src/nnue/nnue_accumulator.cpp                 | 387 ++----------------
+ src/nnue/nnue_accumulator.h                   |  12 +-
+ src/nnue/nnue_architecture.h                  |   8 +-
+ src/nnue/nnue_common.h                        |   9 +-
+ src/nnue/nnue_feature_transformer.h           |  54 +--
+ src/position.cpp                              | 191 +--------
+ src/position.h                                |  60 +--
+ src/search.cpp                                |   7 +-
+ src/types.h                                   |  50 ---
+ 19 files changed, 214 insertions(+), 1593 deletions(-)
+ delete mode 100644 src/nnue/features/full_threats.cpp
+ delete mode 100644 src/nnue/features/full_threats.h
+ delete mode 100644 src/nnue/features/half_ka_v2_hm.h
+ rename src/nnue/features/{half_ka_v2_hm.cpp => p_hm.cpp} (66%)
+ create mode 100644 src/nnue/features/p_hm.h
+ delete mode 100644 src/nnue/features/pp_3wide.cpp
+ delete mode 100644 src/nnue/features/pp_3wide.h
+
+diff --git a/src/Makefile b/src/Makefile
+index e5c94df3..223cdce0 100644
+--- a/src/Makefile
++++ b/src/Makefile
+@@ -80,14 +80,14 @@ SRCS = attacks.cpp benchmark.cpp bitboard.cpp evaluate.cpp main.cpp \
+ 	misc.cpp movegen.cpp movepick.cpp position.cpp \
+ 	search.cpp thread.cpp timeman.cpp tt.cpp uci.cpp ucioption.cpp tune.cpp syzygy/tbprobe.cpp \
+ 	nnue/nnue_accumulator.cpp nnue/nnue_misc.cpp nnue/network.cpp \
+-	nnue/features/half_ka_v2_hm.cpp nnue/features/full_threats.cpp nnue/features/pp_3wide.cpp \
++	nnue/features/p_hm.cpp \
+ 	engine.cpp score.cpp memory.cpp
+ 
+ OTHER_SRCS = universal/entry_x86.cpp universal/entry_arm64.cpp universal/entry_riscv64.cpp universal/nnue_embed.cpp
+ 
+ HEADERS = attacks.h benchmark.h bitboard.h evaluate.h misc.h movegen.h movepick.h history.h \
+-		nnue/nnue_misc.h nnue/features/half_ka_v2_hm.h nnue/features/full_threats.h \
+-		nnue/features/pp_3wide.h nnue/layers/affine_transform.h nnue/layers/affine_transform_sparse_input.h \
++		nnue/nnue_misc.h nnue/features/p_hm.h nnue/layers/affine_transform.h \
++		nnue/layers/affine_transform_sparse_input.h \
+ 		nnue/layers/clipped_relu.h nnue/layers/sqr_clipped_relu.h nnue/nnue_accumulator.h \
+ 		nnue/nnue_architecture.h nnue/nnue_common.h nnue/nnue_feature_transformer.h nnue/simd.h \
+ 		nnue/nnz_helper.h position.h search.h syzygy/tbprobe.h thread.h thread_native.h timeman.h \
+diff --git a/src/attacks.h b/src/attacks.h
+index 46394d60..078ab4bd 100644
+--- a/src/attacks.h
++++ b/src/attacks.h
+@@ -259,18 +259,6 @@ inline constexpr auto PseudoAttacks = []() constexpr {
+     return attacks;
+ }();
+ 
+-inline constexpr auto PawnPushOrAttacks = []() constexpr {
+-    std::array<std::array<Bitboard, SQUARE_NB>, COLOR_NB> attacks{};
+-
+-    for (Square s1 = SQ_A1; s1 <= SQ_H8; ++s1)
+-    {
+-        attacks[WHITE][s1] = pawn_single_push_bb(WHITE, square_bb(s1)) | PseudoAttacks[WHITE][s1];
+-        attacks[BLACK][s1] = pawn_single_push_bb(BLACK, square_bb(s1)) | PseudoAttacks[BLACK][s1];
+-    }
+-
+-    return attacks;
+-}();
+-
+ // Returns the pseudo attacks of the given piece type
+ // assuming an empty board.
+ template<PieceType Pt>
+diff --git a/src/evaluate.h b/src/evaluate.h
+index 84e7c09c..35c70ee0 100644
+--- a/src/evaluate.h
++++ b/src/evaluate.h
+@@ -33,7 +33,7 @@ namespace Eval {
+ // for the build process (profile-build and fishtest) to work. Do not change the
+ // name of the macro or the location where this macro is defined, as it is used
+ // in the Makefile/Fishtest.
+-#define EvalFileDefaultName "nn-1a298aa575a0.nnue"
++#define EvalFileDefaultName "nn-61e7af4bb97d.nnue"
+ 
+ namespace NNUE {
+ class Network;
+diff --git a/src/nnue/features/full_threats.cpp b/src/nnue/features/full_threats.cpp
+deleted file mode 100644
+index ac4f79da..00000000
+--- a/src/nnue/features/full_threats.cpp
++++ /dev/null
+@@ -1,324 +0,0 @@
+-/*
+-  Stockfish, a UCI chess playing engine derived from Glaurung 2.1
+-  Copyright (C) 2004-2026 The Stockfish developers (see AUTHORS file)
+-
+-  Stockfish is free software: you can redistribute it and/or modify
+-  it under the terms of the GNU General Public License as published by
+-  the Free Software Foundation, either version 3 of the License, or
+-  (at your option) any later version.
+-
+-  Stockfish is distributed in the hope that it will be useful,
+-  but WITHOUT ANY WARRANTY; without even the implied warranty of
+-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-  GNU General Public License for more details.
+-
+-  You should have received a copy of the GNU General Public License
+-  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-*/
+-
+-//Definition of input features FullThreats of NNUE evaluation function
+-
+-#include "full_threats.h"
+-
+-#include <array>
+-#include <cstdint>
+-#include <initializer_list>
+-#include <utility>
+-
+-#include "../../attacks.h"
+-#include "../../bitboard.h"
+-#include "../../misc.h"
+-#include "../../position.h"
+-#include "../../types.h"
+-#include "../nnue_common.h"
+-
+-namespace Stockfish::Eval::NNUE::Features {
+-
+-struct HelperOffsets {
+-    int cumulativePieceOffset, cumulativeOffset;
+-};
+-
+-constexpr std::array<Piece, 12> AllPieces = {
+-  W_PAWN, W_KNIGHT, W_BISHOP, W_ROOK, W_QUEEN, W_KING,
+-  B_PAWN, B_KNIGHT, B_BISHOP, B_ROOK, B_QUEEN, B_KING,
+-};
+-
+-template<PieceType PT>
+-constexpr auto make_piece_indices_type() {
+-    static_assert(PT != PieceType::PAWN);
+-
+-    std::array<std::array<u8, SQUARE_NB>, SQUARE_NB> out{};
+-
+-    for (Square from = SQ_A1; from <= SQ_H8; ++from)
+-    {
+-        Bitboard attacks = Attacks::PseudoAttacks[PT][from];
+-
+-        for (Square to = SQ_A1; to <= SQ_H8; ++to)
+-        {
+-            out[from][to] = constexpr_popcount(((1ULL << to) - 1) & attacks);
+-        }
+-    }
+-
+-    return out;
+-}
+-
+-template<Piece P>
+-constexpr auto make_piece_indices_piece() {
+-    static_assert(type_of(P) == PieceType::PAWN);
+-
+-    std::array<std::array<u8, SQUARE_NB>, SQUARE_NB> out{};
+-
+-    constexpr Color C = color_of(P);
+-
+-    for (Square from = SQ_A1; from <= SQ_H8; ++from)
+-    {
+-        Bitboard attacks = Attacks::PseudoAttacks[C][from];
+-
+-        for (Square to = SQ_A1; to <= SQ_H8; ++to)
+-        {
+-            out[from][to] = constexpr_popcount(((1ULL << to) - 1) & attacks);
+-        }
+-    }
+-
+-    return out;
+-}
+-
+-constexpr auto index_lut2_array() {
+-    constexpr auto KNIGHT_ATTACKS = make_piece_indices_type<PieceType::KNIGHT>();
+-    constexpr auto BISHOP_ATTACKS = make_piece_indices_type<PieceType::BISHOP>();
+-    constexpr auto ROOK_ATTACKS   = make_piece_indices_type<PieceType::ROOK>();
+-    constexpr auto QUEEN_ATTACKS  = make_piece_indices_type<PieceType::QUEEN>();
+-    constexpr auto KING_ATTACKS   = make_piece_indices_type<PieceType::KING>();
+-
+-    std::array<std::array<std::array<u8, SQUARE_NB>, SQUARE_NB>, PIECE_NB> indices{};
+-
+-    indices[W_PAWN] = make_piece_indices_piece<W_PAWN>();
+-    indices[B_PAWN] = make_piece_indices_piece<B_PAWN>();
+-
+-    indices[W_KNIGHT] = KNIGHT_ATTACKS;
+-    indices[B_KNIGHT] = KNIGHT_ATTACKS;
+-
+-    indices[W_BISHOP] = BISHOP_ATTACKS;
+-    indices[B_BISHOP] = BISHOP_ATTACKS;
+-
+-    indices[W_ROOK] = ROOK_ATTACKS;
+-    indices[B_ROOK] = ROOK_ATTACKS;
+-
+-    indices[W_QUEEN] = QUEEN_ATTACKS;
+-    indices[B_QUEEN] = QUEEN_ATTACKS;
+-
+-    indices[W_KING] = KING_ATTACKS;
+-    indices[B_KING] = KING_ATTACKS;
+-
+-    return indices;
+-}
+-
+-constexpr auto init_threat_offsets() {
+-    std::array<HelperOffsets, PIECE_NB>                    indices{};
+-    std::array<std::array<IndexType, SQUARE_NB>, PIECE_NB> offsets{};
+-
+-    int cumulativeOffset = 0;
+-    for (Piece piece : AllPieces)
+-    {
+-        int pieceIdx              = piece;
+-        int cumulativePieceOffset = 0;
+-
+-        for (Square from = SQ_A1; from <= SQ_H8; ++from)
+-        {
+-            offsets[pieceIdx][from] = cumulativePieceOffset;
+-
+-            if (type_of(piece) != PAWN)
+-            {
+-                Bitboard attacks = Attacks::PseudoAttacks[type_of(piece)][from];
+-                cumulativePieceOffset += constexpr_popcount(attacks);
+-            }
+-
+-            else if (from >= SQ_A2 && from <= SQ_H7)
+-            {
+-                Bitboard attacks = (pieceIdx < 8) ? Attacks::PseudoAttacks[WHITE][from]
+-                                                  : Attacks::PseudoAttacks[BLACK][from];
+-                cumulativePieceOffset += constexpr_popcount(attacks);
+-            }
+-        }
+-
+-        indices[pieceIdx] = {cumulativePieceOffset, cumulativeOffset};
+-
+-        cumulativeOffset += numValidTargets[pieceIdx] * cumulativePieceOffset;
+-    }
+-
+-    return std::pair{indices, offsets};
+-}
+-
+-constexpr auto helper_offsets = init_threat_offsets().first;
+-// Lookup array for indexing threats
+-constexpr auto offsets = init_threat_offsets().second;
+-
+-constexpr auto init_index_luts() {
+-    std::array<std::array<std::array<u32, 2>, PIECE_NB>, PIECE_NB> indices{};
+-
+-    for (Piece attacker : AllPieces)
+-    {
+-        for (Piece attacked : AllPieces)
+-        {
+-            bool      enemy        = (attacker ^ attacked) == 8;
+-            PieceType attackerType = type_of(attacker);
+-            PieceType attackedType = type_of(attacked);
+-
+-            int  map           = FullThreats::map[attackerType - 1][attackedType - 1];
+-            bool semi_excluded = attackerType == attackedType && (enemy || attackerType != PAWN);
+-            IndexType feature  = helper_offsets[attacker].cumulativeOffset
+-                              + (color_of(attacked) * (numValidTargets[attacker] / 2) + map)
+-                                  * helper_offsets[attacker].cumulativePieceOffset;
+-
+-            bool excluded                  = map < 0;
+-            indices[attacker][attacked][0] = excluded ? FullThreats::Dimensions : feature;
+-            indices[attacker][attacked][1] =
+-              excluded || semi_excluded ? FullThreats::Dimensions : feature;
+-        }
+-    }
+-
+-    return indices;
+-}
+-
+-// The final index is calculated from summing data found in these two LUTs, as well
+-// as offsets[attacker][from]
+-
+-// [attacker][attacked][from < to]
+-constexpr auto index_lut1 = init_index_luts();
+-// [attacker][from][to]
+-constexpr auto index_lut2 = index_lut2_array();
+-
+-// Index of a feature for a given king position and another piece on some square
+-sf_always_inline IndexType FullThreats::make_index(
+-  Color perspective, Piece attacker, Square from, Square to, Piece attacked, Square ksq) {
+-    const i8 orientation   = OrientTBL[ksq] ^ (56 * perspective);
+-    unsigned from_oriented = u8(from) ^ orientation;
+-    unsigned to_oriented   = u8(to) ^ orientation;
+-
+-    i8       swap              = 8 * perspective;
+-    unsigned attacker_oriented = attacker ^ swap;
+-    unsigned attacked_oriented = attacked ^ swap;
+-
+-    return index_lut1[attacker_oriented][attacked_oriented][from_oriented < to_oriented]
+-         + offsets[attacker_oriented][from_oriented]
+-         + index_lut2[attacker_oriented][from_oriented][to_oriented];
+-}
+-
+-// Get a list of indices for active features in ascending order
+-
+-void FullThreats::append_active_indices(Color perspective, const Position& pos, IndexList& active) {
+-    const Square   ksq                = pos.square<KING>(perspective);
+-    const Bitboard occupied           = pos.pieces();
+-    const Bitboard pawnTargets        = pos.pieces(KNIGHT, ROOK);
+-    const Bitboard minorSliderTargets = pos.pieces(PAWN, KNIGHT, BISHOP, ROOK);
+-    const Bitboard queenTargets       = pos.pieces(PAWN, KNIGHT, BISHOP, ROOK, QUEEN);
+-
+-    auto process_pawn_attacks = [&](Color c, Direction attkDir) {
+-        const Bitboard cPawns  = pos.pieces(c, PAWN);
+-        Bitboard       attacks = shift(cPawns, attkDir) & pawnTargets;
+-        while (attacks)
+-        {
+-            Square    to       = pop_lsb(attacks);
+-            Square    from     = to - attkDir;
+-            Piece     attacked = pos.piece_on(to);
+-            Piece     attacker = make_piece(c, PAWN);
+-            IndexType index    = make_index(perspective, attacker, from, to, attacked, ksq);
+-            active.push_back_if_lt(index, Dimensions);
+-        }
+-    };
+-
+-    process_pawn_attacks(WHITE, NORTH_EAST);
+-    process_pawn_attacks(WHITE, NORTH_WEST);
+-
+-    process_pawn_attacks(BLACK, SOUTH_WEST);
+-    process_pawn_attacks(BLACK, SOUTH_EAST);
+-
+-    for (Color c : {WHITE, BLACK})
+-    {
+-        for (PieceType pt = KNIGHT; pt < KING; ++pt)
+-        {
+-            Piece    attacker = make_piece(c, pt);
+-            Bitboard bb       = pos.pieces(c, pt);
+-            Bitboard targets  = pt == KNIGHT || pt == QUEEN ? queenTargets : minorSliderTargets;
+-            while (bb)
+-            {
+-                Square   from    = pop_lsb(bb);
+-                Bitboard attacks = Attacks::attacks_bb(pt, from, occupied) & targets;
+-                while (attacks)
+-                {
+-                    Square    to       = pop_lsb(attacks);
+-                    Piece     attacked = pos.piece_on(to);
+-                    IndexType index    = make_index(perspective, attacker, from, to, attacked, ksq);
+-                    active.push_back_if_lt(index, Dimensions);
+-                }
+-            }
+-        }
+-    }
+-}
+-
+-// Get a list of indices for recently changed features
+-
+-void FullThreats::append_changed_indices(Color                   perspective,
+-                                         Square                  ksq,
+-                                         const DiffType&         diff,
+-                                         IndexList&              removed,
+-                                         IndexList&              added,
+-                                         const ThreatWeightType* prefetchBase,
+-                                         IndexType               prefetchStride) {
+-
+-    for (const auto& dirty : diff.list)
+-    {
+-        auto attacker = dirty.pc();
+-        auto attacked = dirty.threatened_pc();
+-        auto from     = dirty.pc_sq();
+-        auto to       = dirty.threatened_sq();
+-        auto add      = dirty.add();
+-
+-        auto&           insert = add ? added : removed;
+-        const IndexType index  = make_index(perspective, attacker, from, to, attacked, ksq);
+-
+-        if (prefetchBase)
+-            prefetch<PrefetchRw::READ, PrefetchLoc::LOW>(reinterpret_cast<const void*>(
+-              reinterpret_cast<uintptr_t>(prefetchBase) + uintptr_t(index) * prefetchStride));
+-        insert.push_back_if_lt(index, Dimensions);
+-    }
+-}
+-
+-void FullThreats::append_changed_indices_both(Square                  white_ksq,
+-                                              Square                  black_ksq,
+-                                              const DiffType&         diff,
+-                                              IndexList&              white_removed,
+-                                              IndexList&              white_added,
+-                                              IndexList&              black_removed,
+-                                              IndexList&              black_added,
+-                                              const ThreatWeightType* prefetchBase,
+-                                              IndexType               prefetchStride) {
+-
+-    for (const auto& dirty : diff.list)
+-    {
+-        const Piece  attacker = dirty.pc();
+-        const Piece  attacked = dirty.threatened_pc();
+-        const Square from     = dirty.pc_sq();
+-        const Square to       = dirty.threatened_sq();
+-        const bool   add      = dirty.add();
+-
+-        auto& white_insert = add ? white_added : white_removed;
+-        auto& black_insert = add ? black_added : black_removed;
+-
+-        const IndexType white_index = make_index(WHITE, attacker, from, to, attacked, white_ksq);
+-        const IndexType black_index = make_index(BLACK, attacker, from, to, attacked, black_ksq);
+-
+-        if (prefetchBase)
+-        {
+-            prefetch<PrefetchRw::READ, PrefetchLoc::LOW>(reinterpret_cast<const void*>(
+-              reinterpret_cast<uintptr_t>(prefetchBase) + uintptr_t(white_index) * prefetchStride));
+-            prefetch<PrefetchRw::READ, PrefetchLoc::LOW>(reinterpret_cast<const void*>(
+-              reinterpret_cast<uintptr_t>(prefetchBase) + uintptr_t(black_index) * prefetchStride));
+-        }
+-
+-        white_insert.push_back_if_lt(white_index, Dimensions);
+-        black_insert.push_back_if_lt(black_index, Dimensions);
+-    }
+-}
+-
+-}  // namespace Stockfish::Eval::NNUE::Features
+diff --git a/src/nnue/features/full_threats.h b/src/nnue/features/full_threats.h
+deleted file mode 100644
+index f55e9f1d..00000000
+--- a/src/nnue/features/full_threats.h
++++ /dev/null
+@@ -1,100 +0,0 @@
+-/*
+-  Stockfish, a UCI chess playing engine derived from Glaurung 2.1
+-  Copyright (C) 2004-2026 The Stockfish developers (see AUTHORS file)
+-  Stockfish is free software: you can redistribute it and/or modify
+-  it under the terms of the GNU General Public License as published by
+-  the Free Software Foundation, either version 3 of the License, or
+-  (at your option) any later version.
+-  Stockfish is distributed in the hope that it will be useful,
+-  but WITHOUT ANY WARRANTY; without even the implied warranty of
+-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-  GNU General Public License for more details.
+-  You should have received a copy of the GNU General Public License
+-  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-*/
+-
+-//Definition of input features Full_Threats of NNUE evaluation function
+-
+-#ifndef NNUE_FEATURES_FULL_THREATS_INCLUDED
+-#define NNUE_FEATURES_FULL_THREATS_INCLUDED
+-
+-
+-#include "../../misc.h"
+-#include "../../types.h"
+-#include "../nnue_common.h"
+-
+-namespace Stockfish {
+-class Position;
+-}
+-
+-namespace Stockfish::Eval::NNUE::Features {
+-
+-// Pawn diagonal threats only target knights and rooks (pawn-pawn relationships
+-// are handled by the PP_3Wide feature set), so pawns have 4 valid targets.
+-static constexpr int numValidTargets[PIECE_NB] = {0, 4, 10, 8, 8, 10, 0, 0,
+-                                                  0, 4, 10, 8, 8, 10, 0, 0};
+-
+-class FullThreats {
+-   public:
+-    // Hash value embedded in the evaluation file
+-    static constexpr u32 HashValue = 0x2e6b9d04u;
+-
+-    // Number of feature dimensions
+-    static constexpr IndexType Dimensions = 59808;
+-
+-    // clang-format off
+-    // Orient a square according to perspective (rotates by 180 for black)
+-    static constexpr i8 OrientTBL[SQUARE_NB] = {
+-        SQ_A1, SQ_A1, SQ_A1, SQ_A1, SQ_H1, SQ_H1, SQ_H1, SQ_H1,
+-        SQ_A1, SQ_A1, SQ_A1, SQ_A1, SQ_H1, SQ_H1, SQ_H1, SQ_H1,
+-        SQ_A1, SQ_A1, SQ_A1, SQ_A1, SQ_H1, SQ_H1, SQ_H1, SQ_H1,
+-        SQ_A1, SQ_A1, SQ_A1, SQ_A1, SQ_H1, SQ_H1, SQ_H1, SQ_H1,
+-        SQ_A1, SQ_A1, SQ_A1, SQ_A1, SQ_H1, SQ_H1, SQ_H1, SQ_H1,
+-        SQ_A1, SQ_A1, SQ_A1, SQ_A1, SQ_H1, SQ_H1, SQ_H1, SQ_H1,
+-        SQ_A1, SQ_A1, SQ_A1, SQ_A1, SQ_H1, SQ_H1, SQ_H1, SQ_H1,
+-        SQ_A1, SQ_A1, SQ_A1, SQ_A1, SQ_H1, SQ_H1, SQ_H1, SQ_H1,
+-    };
+-
+-    static constexpr int map[PIECE_TYPE_NB-2][PIECE_TYPE_NB-2] = {
+-      {-1,  0, -1,  1, -1, -1},
+-      { 0,  1,  2,  3,  4, -1},
+-      { 0,  1,  2,  3, -1, -1},
+-      { 0,  1,  2,  3, -1, -1},
+-      { 0,  1,  2,  3,  4, -1},
+-      {-1, -1, -1, -1, -1, -1}
+-    };
+-    // clang-format on
+-
+-    // Maximum number of simultaneously active features.
+-    using IndexList = ValueList<u16, 256>;
+-    using DiffType  = DirtyThreats;
+-
+-    static IndexType
+-    make_index(Color perspective, Piece attkr, Square from, Square to, Piece attkd, Square ksq);
+-
+-    // Get a list of indices for active features
+-    static void append_active_indices(Color perspective, const Position& pos, IndexList& active);
+-
+-    // Get a list of indices for recently changed features
+-    static void append_changed_indices(Color                   perspective,
+-                                       Square                  ksq,
+-                                       const DiffType&         diff,
+-                                       IndexList&              removed,
+-                                       IndexList&              added,
+-                                       const ThreatWeightType* prefetchBase   = nullptr,
+-                                       IndexType               prefetchStride = 0);
+-
+-    static void append_changed_indices_both(Square                  white_ksq,
+-                                            Square                  black_ksq,
+-                                            const DiffType&         diff,
+-                                            IndexList&              white_removed,
+-                                            IndexList&              white_added,
+-                                            IndexList&              black_removed,
+-                                            IndexList&              black_added,
+-                                            const ThreatWeightType* prefetchBase   = nullptr,
+-                                            IndexType               prefetchStride = 0);
+-};
+-
+-}  // namespace Stockfish::Eval::NNUE::Features
+-
+-#endif  // #ifndef NNUE_FEATURES_FULL_THREATS_INCLUDED
+diff --git a/src/nnue/features/half_ka_v2_hm.h b/src/nnue/features/half_ka_v2_hm.h
+deleted file mode 100644
+index a9b5d958..00000000
+--- a/src/nnue/features/half_ka_v2_hm.h
++++ /dev/null
+@@ -1,127 +0,0 @@
+-/*
+-  Stockfish, a UCI chess playing engine derived from Glaurung 2.1
+-  Copyright (C) 2004-2026 The Stockfish developers (see AUTHORS file)
+-
+-  Stockfish is free software: you can redistribute it and/or modify
+-  it under the terms of the GNU General Public License as published by
+-  the Free Software Foundation, either version 3 of the License, or
+-  (at your option) any later version.
+-
+-  Stockfish is distributed in the hope that it will be useful,
+-  but WITHOUT ANY WARRANTY; without even the implied warranty of
+-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-  GNU General Public License for more details.
+-
+-  You should have received a copy of the GNU General Public License
+-  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-*/
+-
+-//Definition of input features HalfKAv2_hm of NNUE evaluation function
+-
+-#ifndef NNUE_FEATURES_HALF_KA_V2_HM_H_INCLUDED
+-#define NNUE_FEATURES_HALF_KA_V2_HM_H_INCLUDED
+-
+-#include "../../misc.h"
+-#include "../../types.h"
+-#include "../nnue_common.h"
+-
+-namespace Stockfish::Eval::NNUE::Features {
+-
+-// Feature HalfKAv2_hm: Combination of the position of own king and the
+-// position of pieces. Position mirrored such that king is always on e..h files.
+-class HalfKAv2_hm {
+-
+-    // Unique number for each piece type on each square
+-    enum {
+-        PS_NONE     = 0,
+-        PS_W_PAWN   = 0,
+-        PS_B_PAWN   = 1 * SQUARE_NB,
+-        PS_W_KNIGHT = 2 * SQUARE_NB,
+-        PS_B_KNIGHT = 3 * SQUARE_NB,
+-        PS_W_BISHOP = 4 * SQUARE_NB,
+-        PS_B_BISHOP = 5 * SQUARE_NB,
+-        PS_W_ROOK   = 6 * SQUARE_NB,
+-        PS_B_ROOK   = 7 * SQUARE_NB,
+-        PS_W_QUEEN  = 8 * SQUARE_NB,
+-        PS_B_QUEEN  = 9 * SQUARE_NB,
+-        PS_KING     = 10 * SQUARE_NB,
+-        PS_NB       = 11 * SQUARE_NB
+-    };
+-
+-    alignas(64) static constexpr u16 PieceSquareIndex[COLOR_NB][PIECE_NB] = {
+-      // Convention: W - us, B - them
+-      // Viewed from other side, W and B are reversed
+-      {PS_NONE, PS_W_PAWN, PS_W_KNIGHT, PS_W_BISHOP, PS_W_ROOK, PS_W_QUEEN, PS_KING, PS_NONE,
+-       PS_NONE, PS_B_PAWN, PS_B_KNIGHT, PS_B_BISHOP, PS_B_ROOK, PS_B_QUEEN, PS_KING, PS_NONE},
+-      {PS_NONE, PS_B_PAWN, PS_B_KNIGHT, PS_B_BISHOP, PS_B_ROOK, PS_B_QUEEN, PS_KING, PS_NONE,
+-       PS_NONE, PS_W_PAWN, PS_W_KNIGHT, PS_W_BISHOP, PS_W_ROOK, PS_W_QUEEN, PS_KING, PS_NONE}};
+-
+-   public:
+-    // Hash value embedded in the evaluation file
+-    static constexpr u32 HashValue = 0x7f234cb8u;
+-
+-    // Number of feature dimensions
+-    static constexpr IndexType Dimensions =
+-      static_cast<IndexType>(SQUARE_NB) * static_cast<IndexType>(PS_NB) / 2;
+-
+-#define B(v) (v * PS_NB)
+-    // clang-format off
+-    static constexpr IndexType KingBuckets[SQUARE_NB] = {
+-        B(28), B(29), B(30), B(31), B(31), B(30), B(29), B(28),
+-        B(24), B(25), B(26), B(27), B(27), B(26), B(25), B(24),
+-        B(20), B(21), B(22), B(23), B(23), B(22), B(21), B(20),
+-        B(16), B(17), B(18), B(19), B(19), B(18), B(17), B(16),
+-        B(12), B(13), B(14), B(15), B(15), B(14), B(13), B(12),
+-        B( 8), B( 9), B(10), B(11), B(11), B(10), B( 9), B( 8),
+-        B( 4), B( 5), B( 6), B( 7), B( 7), B( 6), B( 5), B( 4),
+-        B( 0), B( 1), B( 2), B( 3), B( 3), B( 2), B( 1), B( 0),
+-    };
+-    // clang-format on
+-#undef B
+-    // clang-format off
+-    // Orient a square according to perspective (rotates by 180 for black)
+-    static constexpr IndexType OrientTBL[SQUARE_NB] = {
+-        SQ_H1, SQ_H1, SQ_H1, SQ_H1, SQ_A1, SQ_A1, SQ_A1, SQ_A1,
+-        SQ_H1, SQ_H1, SQ_H1, SQ_H1, SQ_A1, SQ_A1, SQ_A1, SQ_A1,
+-        SQ_H1, SQ_H1, SQ_H1, SQ_H1, SQ_A1, SQ_A1, SQ_A1, SQ_A1,
+-        SQ_H1, SQ_H1, SQ_H1, SQ_H1, SQ_A1, SQ_A1, SQ_A1, SQ_A1,
+-        SQ_H1, SQ_H1, SQ_H1, SQ_H1, SQ_A1, SQ_A1, SQ_A1, SQ_A1,
+-        SQ_H1, SQ_H1, SQ_H1, SQ_H1, SQ_A1, SQ_A1, SQ_A1, SQ_A1,
+-        SQ_H1, SQ_H1, SQ_H1, SQ_H1, SQ_A1, SQ_A1, SQ_A1, SQ_A1,
+-        SQ_H1, SQ_H1, SQ_H1, SQ_H1, SQ_A1, SQ_A1, SQ_A1, SQ_A1 ,
+-    };
+-    // clang-format on
+-
+-    // Maximum number of simultaneously active features.
+-    static constexpr IndexType MaxActiveDimensions = 32;
+-    using IndexList                                = ValueList<u16, MaxActiveDimensions>;
+-    using DiffType                                 = DirtyPiece;
+-
+-#if defined(USE_AVX512ICL)
+-    // Compute all changed feature indices and write them to the given lists
+-    static void write_indices(const std::array<Piece, SQUARE_NB>& oldPieces,
+-                              const std::array<Piece, SQUARE_NB>& newPieces,
+-                              Bitboard                            removedBB,
+-                              Bitboard                            addedBB,
+-                              Color                               perspective,
+-                              Square                              ksq,
+-                              IndexList&                          removed,
+-                              IndexList&                          added);
+-#endif
+-
+-    // Index of a feature for a given king position and another piece on some square
+-
+-    static IndexType make_index(Color perspective, Square s, Piece pc, Square ksq);
+-
+-    // Get a list of indices for recently changed features
+-    static void append_changed_indices(
+-      Color perspective, Square ksq, const DiffType& diff, IndexList& removed, IndexList& added);
+-
+-    // Returns whether the change stored in this DirtyPiece means
+-    // that a full accumulator refresh is required.
+-    static bool requires_refresh(const DiffType& diff, Color perspective);
+-};
+-
+-}  // namespace Stockfish::Eval::NNUE::Features
+-
+-#endif  // #ifndef NNUE_FEATURES_HALF_KA_V2_HM_H_INCLUDED
+diff --git a/src/nnue/features/half_ka_v2_hm.cpp b/src/nnue/features/p_hm.cpp
+similarity index 66%
+rename from src/nnue/features/half_ka_v2_hm.cpp
+rename to src/nnue/features/p_hm.cpp
+index 33a7cd2e..9faae7ef 100644
+--- a/src/nnue/features/half_ka_v2_hm.cpp
++++ b/src/nnue/features/p_hm.cpp
+@@ -16,9 +16,9 @@
+   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+ 
+-//Definition of input features HalfKAv2_hm of NNUE evaluation function
++// Definition of input features P_hm of NNUE evaluation function
+ 
+-#include "half_ka_v2_hm.h"
++#include "p_hm.h"
+ 
+ #include "../../types.h"
+ #include "../nnue_common.h"
+@@ -30,14 +30,14 @@
+ namespace Stockfish::Eval::NNUE::Features {
+ 
+ #if defined(USE_AVX512ICL)
+-void HalfKAv2_hm::write_indices(const std::array<Piece, SQUARE_NB>& oldPieces,
+-                                const std::array<Piece, SQUARE_NB>& newPieces,
+-                                Bitboard                            removedBB,
+-                                Bitboard                            addedBB,
+-                                Color                               perspective,
+-                                Square                              ksq,
+-                                IndexList&                          removed,
+-                                IndexList&                          added) {
++void P_hm::write_indices(const std::array<Piece, SQUARE_NB>& oldPieces,
++                         const std::array<Piece, SQUARE_NB>& newPieces,
++                         Bitboard                            removedBB,
++                         Bitboard                            addedBB,
++                         Color                               perspective,
++                         Square                              ksq,
++                         IndexList&                          removed,
++                         IndexList&                          added) {
+ 
+     auto* write_removed = removed.make_space(popcount(removedBB));
+     auto* write_added   = added.make_space(popcount(addedBB));
+@@ -45,16 +45,15 @@ void HalfKAv2_hm::write_indices(const std::array<Piece, SQUARE_NB>& oldPieces,
+     const __m512i vecOldPieces = _mm512_loadu_si512(oldPieces.data());
+     const __m512i vecNewPieces = _mm512_loadu_si512(newPieces.data());
+ 
+-    // PieceSquareIndex and KingBuckets are multiples of 64, while s and orient
+-    // use only the low six bits. Therefore no carry crosses bit 6, and
+-    // (s ^ orient) + psi[pc] + bucket == s ^ (psi[pc] + bucket + orient),
+-    // allowing the orientation to be folded into the per-piece lookup offset.
++    // PieceSquareIndex entries are multiples of 64, while s and orient use only
++    // the low six bits. Therefore no carry crosses bit 6, and
++    // (s ^ orient) + psi[pc] == s ^ (psi[pc] + orient), allowing the orientation
++    // to be folded into the per-piece lookup offset.
+     const u16     flip   = 56 * perspective;
+     const u16     orient = u16(OrientTBL[ksq]) ^ flip;
+     const __m512i psi =
+       _mm512_castsi256_si512(_mm256_loadu_si256((const __m256i*) PieceSquareIndex[perspective]));
+-    const __m512i psi_plus_offset =
+-      _mm512_add_epi16(psi, _mm512_set1_epi16(u16(KingBuckets[int(ksq) ^ flip] + orient)));
++    const __m512i psi_plus_offset = _mm512_add_epi16(psi, _mm512_set1_epi16(orient));
+ 
+     __m512i removed_squares = _mm512_maskz_compress_epi8(removedBB, AllSquares);
+     __m512i added_squares   = _mm512_maskz_compress_epi8(addedBB, AllSquares);
+@@ -76,17 +75,12 @@ void HalfKAv2_hm::write_indices(const std::array<Piece, SQUARE_NB>& oldPieces,
+ }
+ #endif
+ 
+-// Index of a feature for a given king position and another piece on some square
+-
+-IndexType HalfKAv2_hm::make_index(Color perspective, Square s, Piece pc, Square ksq) {
++IndexType P_hm::make_index(Color perspective, Square s, Piece pc, Square ksq) {
+     const IndexType flip = 56 * perspective;
+-    return (IndexType(s) ^ OrientTBL[ksq] ^ flip) + PieceSquareIndex[perspective][pc]
+-         + KingBuckets[int(ksq) ^ flip];
++    return (IndexType(s) ^ OrientTBL[ksq] ^ flip) + PieceSquareIndex[perspective][pc];
+ }
+ 
+-// Get a list of indices for recently changed features
+-
+-void HalfKAv2_hm::append_changed_indices(
++void P_hm::append_changed_indices(
+   Color perspective, Square ksq, const DiffType& diff, IndexList& removed, IndexList& added) {
+     removed.push_back(make_index(perspective, diff.from, diff.pc, ksq));
+     if (diff.to != SQ_NONE)
+@@ -99,8 +93,8 @@ void HalfKAv2_hm::append_changed_indices(
+         added.push_back(make_index(perspective, diff.add_sq, diff.add_pc, ksq));
+ }
+ 
+-bool HalfKAv2_hm::requires_refresh(const DiffType& diff, Color perspective) {
+-    return diff.pc == make_piece(perspective, KING);
++bool P_hm::requires_refresh(const DiffType& diff, Color perspective) {
++    return diff.pc == make_piece(perspective, KING) && OrientTBL[diff.from] != OrientTBL[diff.to];
+ }
+ 
+ }  // namespace Stockfish::Eval::NNUE::Features
+diff --git a/src/nnue/features/p_hm.h b/src/nnue/features/p_hm.h
+new file mode 100644
+index 00000000..3532a8d9
+--- /dev/null
++++ b/src/nnue/features/p_hm.h
+@@ -0,0 +1,103 @@
++/*
++  Stockfish, a UCI chess playing engine derived from Glaurung 2.1
++  Copyright (C) 2004-2026 The Stockfish developers (see AUTHORS file)
++
++  Stockfish is free software: you can redistribute it and/or modify
++  it under the terms of the GNU General Public License as published by
++  the Free Software Foundation, either version 3 of the License, or
++  (at your option) any later version.
++
++  Stockfish is distributed in the hope that it will be useful,
++  but WITHOUT ANY WARRANTY; without even the implied warranty of
++  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++  GNU General Public License for more details.
++
++  You should have received a copy of the GNU General Public License
++  along with this program.  If not, see <http://www.gnu.org/licenses/>.
++*/
++
++// Definition of input features P_hm of NNUE evaluation function
++
++#ifndef NNUE_FEATURES_P_HM_H_INCLUDED
++#define NNUE_FEATURES_P_HM_H_INCLUDED
++
++#include "../../misc.h"
++#include "../../types.h"
++#include "../nnue_common.h"
++
++namespace Stockfish::Eval::NNUE::Features {
++
++// Feature P_hm: The color-relative piece and its square. The position is
++// mirrored horizontally such that the friendly king is always on e..h files.
++class P_hm {
++
++    enum {
++        PS_NONE     = 0,
++        PS_W_PAWN   = 0,
++        PS_W_KNIGHT = 1 * SQUARE_NB,
++        PS_W_BISHOP = 2 * SQUARE_NB,
++        PS_W_ROOK   = 3 * SQUARE_NB,
++        PS_W_QUEEN  = 4 * SQUARE_NB,
++        PS_W_KING   = 5 * SQUARE_NB,
++        PS_B_PAWN   = 6 * SQUARE_NB,
++        PS_B_KNIGHT = 7 * SQUARE_NB,
++        PS_B_BISHOP = 8 * SQUARE_NB,
++        PS_B_ROOK   = 9 * SQUARE_NB,
++        PS_B_QUEEN  = 10 * SQUARE_NB,
++        PS_B_KING   = 11 * SQUARE_NB,
++        PS_NB       = 12 * SQUARE_NB
++    };
++
++    alignas(64) static constexpr u16 PieceSquareIndex[COLOR_NB][PIECE_NB] = {
++      // Convention: W - us, B - them. Viewed from the other side, W and B are reversed.
++      {PS_NONE, PS_W_PAWN, PS_W_KNIGHT, PS_W_BISHOP, PS_W_ROOK, PS_W_QUEEN, PS_W_KING, PS_NONE,
++       PS_NONE, PS_B_PAWN, PS_B_KNIGHT, PS_B_BISHOP, PS_B_ROOK, PS_B_QUEEN, PS_B_KING, PS_NONE},
++      {PS_NONE, PS_B_PAWN, PS_B_KNIGHT, PS_B_BISHOP, PS_B_ROOK, PS_B_QUEEN, PS_B_KING, PS_NONE,
++       PS_NONE, PS_W_PAWN, PS_W_KNIGHT, PS_W_BISHOP, PS_W_ROOK, PS_W_QUEEN, PS_W_KING, PS_NONE}};
++
++   public:
++    // Hash value embedded in the evaluation file
++    static constexpr u32 HashValue = 0x6f234cb8u;
++
++    // One feature for each of 12 color-relative piece types on each square.
++    static constexpr IndexType Dimensions = PS_NB;
++
++    // Horizontal orientation according to the friendly king square.
++    // Perspective rotation is applied separately.
++    static constexpr IndexType OrientTBL[SQUARE_NB] = {
++      SQ_H1, SQ_H1, SQ_H1, SQ_H1, SQ_A1, SQ_A1, SQ_A1, SQ_A1, SQ_H1, SQ_H1, SQ_H1, SQ_H1, SQ_A1,
++      SQ_A1, SQ_A1, SQ_A1, SQ_H1, SQ_H1, SQ_H1, SQ_H1, SQ_A1, SQ_A1, SQ_A1, SQ_A1, SQ_H1, SQ_H1,
++      SQ_H1, SQ_H1, SQ_A1, SQ_A1, SQ_A1, SQ_A1, SQ_H1, SQ_H1, SQ_H1, SQ_H1, SQ_A1, SQ_A1, SQ_A1,
++      SQ_A1, SQ_H1, SQ_H1, SQ_H1, SQ_H1, SQ_A1, SQ_A1, SQ_A1, SQ_A1, SQ_H1, SQ_H1, SQ_H1, SQ_H1,
++      SQ_A1, SQ_A1, SQ_A1, SQ_A1, SQ_H1, SQ_H1, SQ_H1, SQ_H1, SQ_A1, SQ_A1, SQ_A1, SQ_A1};
++
++    static constexpr IndexType MaxActiveDimensions = 32;
++    using IndexList                                = ValueList<u16, MaxActiveDimensions>;
++    using DiffType                                 = DirtyPiece;
++
++#if defined(USE_AVX512ICL)
++    static void write_indices(const std::array<Piece, SQUARE_NB>& oldPieces,
++                              const std::array<Piece, SQUARE_NB>& newPieces,
++                              Bitboard                            removedBB,
++                              Bitboard                            addedBB,
++                              Color                               perspective,
++                              Square                              ksq,
++                              IndexList&                          removed,
++                              IndexList&                          added);
++#endif
++
++    static IndexType make_index(Color perspective, Square s, Piece pc, Square ksq);
++
++    static void append_changed_indices(
++      Color perspective, Square ksq, const DiffType& diff, IndexList& removed, IndexList& added);
++
++    static bool requires_refresh(const DiffType& diff, Color perspective);
++
++    static constexpr IndexType refresh_bucket(Square ksq) { return OrientTBL[ksq] == SQ_H1; }
++};
++
++static_assert(P_hm::Dimensions == 12 * SQUARE_NB);
++
++}  // namespace Stockfish::Eval::NNUE::Features
++
++#endif  // #ifndef NNUE_FEATURES_P_HM_H_INCLUDED
+diff --git a/src/nnue/features/pp_3wide.cpp b/src/nnue/features/pp_3wide.cpp
+deleted file mode 100644
+index fca1dfe7..00000000
+--- a/src/nnue/features/pp_3wide.cpp
++++ /dev/null
+@@ -1,238 +0,0 @@
+-/*
+-  Stockfish, a UCI chess playing engine derived from Glaurung 2.1
+-  Copyright (C) 2004-2026 The Stockfish developers (see AUTHORS file)
+-
+-  Stockfish is free software: you can redistribute it and/or modify
+-  it under the terms of the GNU General Public License as published by
+-  the Free Software Foundation, either version 3 of the License, or
+-  (at your option) any later version.
+-
+-  Stockfish is distributed in the hope that it will be useful,
+-  but WITHOUT ANY WARRANTY; without even the implied warranty of
+-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-  GNU General Public License for more details.
+-
+-  You should have received a copy of the GNU General Public License
+-  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-*/
+-
+-#include "pp_3wide.h"
+-
+-#include <algorithm>
+-#include <cassert>
+-#include <cstdint>
+-
+-#include "full_threats.h"
+-#include "../../bitboard.h"
+-#include "../../misc.h"
+-#include "../../position.h"
+-#include "../../types.h"
+-#include "../nnue_common.h"
+-
+-namespace Stockfish::Eval::NNUE::Features {
+-
+-constexpr IndexType make_pawn_id(Color color, Square square) {
+-    assert(square >= SQ_A2 && square <= SQ_H7);
+-    return 48 * int(color) + square - SQ_A2;
+-}
+-
+-#ifdef USE_AVX512ICL
+-static inline __m256i pp_idx_epi16(__m256i a, __m256i b) {
+-    const __m256i hi   = _mm256_max_epu16(a, b);
+-    const __m256i lo   = _mm256_min_epu16(a, b);
+-    const __m256i prod = _mm256_mullo_epi16(hi, _mm256_sub_epi16(hi, _mm256_set1_epi16(1)));
+-    return _mm256_add_epi16(_mm256_add_epi16(_mm256_srli_epi16(prod, 1), lo),
+-                            _mm256_set1_epi16(i16(PP_3Wide::IndexBase)));
+-}
+-#endif
+-
+-sf_always_inline IndexType PP_3Wide::make_index(
+-  Color perspective, Color color, Square from, Square to, Color pairedColor, Square ksq) {
+-    const i8 orientation   = FullThreats::OrientTBL[ksq] ^ (56 * perspective);
+-    unsigned from_oriented = u8(from) ^ orientation;
+-    unsigned to_oriented   = u8(to) ^ orientation;
+-
+-    Color color_oriented       = Color(color ^ perspective);
+-    Color pairedColor_oriented = Color(pairedColor ^ perspective);
+-
+-    assert(from_oriented >= SQ_A2 && from_oriented <= SQ_H7);
+-    assert(to_oriented >= SQ_A2 && to_oriented <= SQ_H7);
+-
+-    const IndexType idA = make_pawn_id(color_oriented, Square(from_oriented));
+-    const IndexType idB = make_pawn_id(pairedColor_oriented, Square(to_oriented));
+-    const IndexType hi  = std::max(idA, idB);
+-    const IndexType lo  = std::min(idA, idB);
+-
+-    return hi * (hi - 1) / 2 + lo + IndexBase;
+-}
+-
+-void PP_3Wide::append_active_indices(Color perspective, const Position& pos, IndexList& active) {
+-    const Square   ksq   = pos.square<KING>(perspective);
+-    const Bitboard white = pos.pieces(WHITE, PAWN);
+-    const Bitboard black = pos.pieces(BLACK, PAWN);
+-
+-    Bitboard bb = white;
+-    while (bb)
+-    {
+-        Square         from = pop_lsb(bb);
+-        const Bitboard band = pawn_pair_bb(from);
+-        for (Bitboard ww = band & bb; ww;)
+-            active.push_back(make_index(perspective, WHITE, from, pop_lsb(ww), WHITE, ksq));
+-        for (Bitboard wb = band & black; wb;)
+-            active.push_back(make_index(perspective, WHITE, from, pop_lsb(wb), BLACK, ksq));
+-    }
+-
+-    bb = black;
+-    while (bb)
+-    {
+-        Square         from = pop_lsb(bb);
+-        const Bitboard band = pawn_pair_bb(from);
+-        for (Bitboard bbk = band & bb; bbk;)
+-            active.push_back(make_index(perspective, BLACK, from, pop_lsb(bbk), BLACK, ksq));
+-    }
+-}
+-
+-void PP_3Wide::append_changed_indices(Color                                    perspective,
+-                                      Square                                   ksq,
+-                                      const DiffType&                          diff,
+-                                      IndexList&                               removed,
+-                                      IndexList&                               added,
+-                                      [[maybe_unused]] const ThreatWeightType* prefetchBase,
+-                                      [[maybe_unused]] IndexType               prefetchStride) {
+-
+-    const Bitboard whiteBefore = diff.before[WHITE];
+-    const Bitboard blackBefore = diff.before[BLACK];
+-    const Bitboard whiteAfter  = diff.after[WHITE];
+-    const Bitboard blackAfter  = diff.after[BLACK];
+-
+-    if (whiteBefore == whiteAfter && blackBefore == blackAfter)
+-        return;
+-
+-#ifdef USE_AVX512ICL
+-    const u8      orientation = u8(FullThreats::OrientTBL[ksq]) ^ u8(56 * perspective);
+-    const __m512i iota        = AllSquares;
+-    const __m512i adjusted =
+-      _mm512_sub_epi8(_mm512_xor_si512(iota, _mm512_set1_epi8(orientation)), _mm512_set1_epi8(8));
+-
+-    auto generate = [&](Bitboard updatedW, Bitboard updatedB, Bitboard pawnsW, Bitboard pawnsB,
+-                        IndexList& out) {
+-        const Bitboard friendly = perspective == WHITE ? pawnsW : pawnsB;
+-        const Bitboard enemy    = perspective == WHITE ? pawnsB : pawnsW;
+-        const __m512i  ids      = _mm512_mask_blend_epi8(
+-          friendly, _mm512_add_epi8(adjusted, _mm512_set1_epi8(48)), adjusted);
+-
+-        const Bitboard unchanged = (pawnsW | pawnsB) & ~(updatedW | updatedB);
+-        for (Bitboard u = updatedW | updatedB; u;)
+-        {
+-            const Square   a        = pop_lsb(u);
+-            const Bitboard partners = pawn_pair_bb(a) & (unchanged | u);
+-            const int      n        = popcount(partners);
+-            if (!n)
+-                continue;
+-
+-            const u16     colorOff = (enemy & a) ? 48 : 0;
+-            const u16     aId      = u16(((u8(a) ^ orientation) - 8) + colorOff);
+-            const __m256i pids     = _mm256_cvtepu8_epi16(
+-              _mm512_castsi512_si128(_mm512_maskz_compress_epi8(partners, ids)));
+-            const __m256i feats = pp_idx_epi16(_mm256_set1_epi16(aId), pids);
+-
+-            u16* w = out.make_space(n);
+-            _mm256_storeu_epi16(w, feats);
+-        }
+-    };
+-#else
+-    auto generate = [&](Bitboard updatedW, Bitboard updatedB, Bitboard pawnsW, Bitboard pawnsB,
+-                        IndexList& out) {
+-        auto push = [&](IndexType index) {
+-            if (prefetchBase)
+-                prefetch<PrefetchRw::READ, PrefetchLoc::LOW>(reinterpret_cast<const void*>(
+-                  reinterpret_cast<uintptr_t>(prefetchBase) + uintptr_t(index) * prefetchStride));
+-            out.push_back(index);
+-        };
+-        const Bitboard unchanged = (pawnsW | pawnsB) & ~(updatedW | updatedB);
+-        for (Bitboard u = updatedW | updatedB; u;)
+-        {
+-            const Square   a    = pop_lsb(u);
+-            const Bitboard mask = pawn_pair_bb(a) & (unchanged | u);
+-            const Color    aCol = (pawnsB & a) ? BLACK : WHITE;
+-            for (Bitboard pb = pawnsB & mask; pb;)
+-                push(make_index(perspective, aCol, a, pop_lsb(pb), BLACK, ksq));
+-            for (Bitboard pw = pawnsW & mask; pw;)
+-                push(make_index(perspective, aCol, a, pop_lsb(pw), WHITE, ksq));
+-        }
+-    };
+-#endif
+-
+-    generate(whiteAfter & ~whiteBefore, blackAfter & ~blackBefore, whiteAfter, blackAfter, added);
+-    generate(whiteBefore & ~whiteAfter, blackBefore & ~blackAfter, whiteBefore, blackBefore,
+-             removed);
+-}
+-
+-void PP_3Wide::append_changed_indices_both(Square                  white_ksq,
+-                                           Square                  black_ksq,
+-                                           const DiffType&         diff,
+-                                           IndexList&              white_removed,
+-                                           IndexList&              white_added,
+-                                           IndexList&              black_removed,
+-                                           IndexList&              black_added,
+-                                           const ThreatWeightType* prefetchBase,
+-                                           IndexType               prefetchStride) {
+-
+-#ifdef USE_AVX512ICL
+-    append_changed_indices(WHITE, white_ksq, diff, white_removed, white_added, prefetchBase,
+-                           prefetchStride);
+-    append_changed_indices(BLACK, black_ksq, diff, black_removed, black_added, prefetchBase,
+-                           prefetchStride);
+-#else
+-    const Bitboard whiteBefore = diff.before[WHITE];
+-    const Bitboard blackBefore = diff.before[BLACK];
+-    const Bitboard whiteAfter  = diff.after[WHITE];
+-    const Bitboard blackAfter  = diff.after[BLACK];
+-
+-    if (whiteBefore == whiteAfter && blackBefore == blackAfter)
+-        return;
+-
+-    auto generate = [&](Bitboard updatedW, Bitboard updatedB, Bitboard pawnsW, Bitboard pawnsB,
+-                        IndexList& white_out, IndexList& black_out) {
+-        auto push = [&](Color color, Square from, Square to, Color pairedColor) {
+-            const IndexType white_index =
+-              make_index(WHITE, color, from, to, pairedColor, white_ksq);
+-            const IndexType black_index =
+-              make_index(BLACK, color, from, to, pairedColor, black_ksq);
+-
+-            if (prefetchBase)
+-            {
+-                prefetch<PrefetchRw::READ, PrefetchLoc::LOW>(
+-                  reinterpret_cast<const void*>(reinterpret_cast<uintptr_t>(prefetchBase)
+-                                                + uintptr_t(white_index) * prefetchStride));
+-                prefetch<PrefetchRw::READ, PrefetchLoc::LOW>(
+-                  reinterpret_cast<const void*>(reinterpret_cast<uintptr_t>(prefetchBase)
+-                                                + uintptr_t(black_index) * prefetchStride));
+-            }
+-
+-            white_out.push_back(white_index);
+-            black_out.push_back(black_index);
+-        };
+-
+-        const Bitboard unchanged = (pawnsW | pawnsB) & ~(updatedW | updatedB);
+-        for (Bitboard updated = updatedW | updatedB; updated;)
+-        {
+-            const Square   from  = pop_lsb(updated);
+-            const Bitboard mask  = pawn_pair_bb(from) & (unchanged | updated);
+-            const Color    color = (pawnsB & from) ? BLACK : WHITE;
+-
+-            for (Bitboard paired = pawnsB & mask; paired;)
+-                push(color, from, pop_lsb(paired), BLACK);
+-            for (Bitboard paired = pawnsW & mask; paired;)
+-                push(color, from, pop_lsb(paired), WHITE);
+-        }
+-    };
+-
+-    generate(whiteAfter & ~whiteBefore, blackAfter & ~blackBefore, whiteAfter, blackAfter,
+-             white_added, black_added);
+-    generate(whiteBefore & ~whiteAfter, blackBefore & ~blackAfter, whiteBefore, blackBefore,
+-             white_removed, black_removed);
+-#endif
+-}
+-
+-}  // namespace Stockfish::Eval::NNUE::Features
+diff --git a/src/nnue/features/pp_3wide.h b/src/nnue/features/pp_3wide.h
+deleted file mode 100644
+index 9ff15593..00000000
+--- a/src/nnue/features/pp_3wide.h
++++ /dev/null
+@@ -1,71 +0,0 @@
+-/*
+-  Stockfish, a UCI chess playing engine derived from Glaurung 2.1
+-  Copyright (C) 2004-2026 The Stockfish developers (see AUTHORS file)
+-
+-  Stockfish is free software: you can redistribute it and/or modify
+-  it under the terms of the GNU General Public License as published by
+-  the Free Software Foundation, either version 3 of the License, or
+-  (at your option) any later version.
+-
+-  Stockfish is distributed in the hope that it will be useful,
+-  but WITHOUT ANY WARRANTY; without even the implied warranty of
+-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-  GNU General Public License for more details.
+-
+-  You should have received a copy of the GNU General Public License
+-  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-*/
+-
+-#ifndef NNUE_FEATURES_PP_3WIDE_INCLUDED
+-#define NNUE_FEATURES_PP_3WIDE_INCLUDED
+-
+-#include "../../misc.h"
+-#include "../../types.h"
+-#include "../nnue_common.h"
+-
+-namespace Stockfish {
+-class Position;
+-}
+-
+-namespace Stockfish::Eval::NNUE::Features {
+-
+-class PP_3Wide {
+-   public:
+-    static constexpr u32 HashValue = 0x86f2b1ddu;
+-
+-    static constexpr IndexType PawnIds    = COLOR_NB * 48;
+-    static constexpr IndexType Dimensions = PawnIds * (PawnIds - 1) / 2;
+-
+-    // Pawn pair feature indices are concatenated to threats, so this must equal ThreatFeatureSet::Dimensions;
+-    // see nnue_feature_transformer.h
+-    static constexpr IndexType IndexBase = 59808;
+-    using IndexList                      = ValueList<u16, 256>;
+-    using DiffType                       = DirtyPawnPairs;
+-
+-    static IndexType make_index(
+-      Color perspective, Color color, Square from, Square to, Color pairedColor, Square ksq);
+-
+-    static void append_active_indices(Color perspective, const Position& pos, IndexList& active);
+-
+-    static void append_changed_indices(Color                   perspective,
+-                                       Square                  ksq,
+-                                       const DiffType&         diff,
+-                                       IndexList&              removed,
+-                                       IndexList&              added,
+-                                       const ThreatWeightType* prefetchBase   = nullptr,
+-                                       IndexType               prefetchStride = 0);
+-
+-    static void append_changed_indices_both(Square                  white_ksq,
+-                                            Square                  black_ksq,
+-                                            const DiffType&         diff,
+-                                            IndexList&              white_removed,
+-                                            IndexList&              white_added,
+-                                            IndexList&              black_removed,
+-                                            IndexList&              black_added,
+-                                            const ThreatWeightType* prefetchBase   = nullptr,
+-                                            IndexType               prefetchStride = 0);
+-};
+-
+-}  // namespace Stockfish::Eval::NNUE::Features
+-
+-#endif  // #ifndef NNUE_FEATURES_PP_3WIDE_INCLUDED
+diff --git a/src/nnue/nnue_accumulator.cpp b/src/nnue/nnue_accumulator.cpp
+index b7fb950d..8720693d 100644
+--- a/src/nnue/nnue_accumulator.cpp
++++ b/src/nnue/nnue_accumulator.cpp
+@@ -55,13 +55,6 @@ void update_accumulator_refresh_cache(Color                     perspective,
+                                       const Position&           pos,
+                                       AccumulatorState&         accumulatorState,
+                                       AccumulatorCaches&        cache);
+-
+-void update_accumulator_hybrid(Color                     perspective,
+-                               const Position&           pos,
+-                               const FeatureTransformer& featureTransformer,
+-                               AccumulatorState&         target,
+-                               const AccumulatorState&   computed,
+-                               AccumulatorCaches&        cache);
+ }
+ 
+ const AccumulatorState& AccumulatorStack::latest() const noexcept { return accumulators[size - 1]; }
+@@ -70,20 +63,16 @@ AccumulatorState& AccumulatorStack::mut_latest() noexcept { return accumulators[
+ 
+ void AccumulatorStack::reset() noexcept {
+     accumulators[0].dirtyPiece = {};
+-    new (&accumulators[0].dirtyThreats) DirtyThreats;
+-    new (&accumulators[0].dirtyPawnPairs) DirtyPawnPairs;
+     accumulators[0].computed.fill(false);
+     size = 1;
+ }
+ 
+-Dirties& AccumulatorStack::push() noexcept {
++DirtyPiece& AccumulatorStack::push() noexcept {
+     assert(size < MaxSize);
+     auto& st = accumulators[size];
+     st.computed.fill(false);
+-    new (&st.dirtyThreats) DirtyThreats;
+-    new (&st.dirtyPawnPairs) DirtyPawnPairs;
+     size++;
+-    return st;
++    return st.dirtyPiece;
+ }
+ 
+ void AccumulatorStack::pop() noexcept {
+@@ -113,27 +102,11 @@ void AccumulatorStack::evaluate_side(Color                     perspective,
+                                      AccumulatorCaches&        cache,
+                                      usize                     last_usable_accum) noexcept {
+ 
+-    constexpr int MIN_PC_COUNT_HYBRID = 15;
+-
+     if (accumulators[last_usable_accum].computed[perspective])
+         forward_update_incremental(perspective, pos, featureTransformer, last_usable_accum);
+ 
+     else
+     {
+-        const auto& dirtyPiece = latest().dirtyPiece;
+-
+-        if (dirtyPiece.pc == make_piece(perspective, KING)
+-            && accumulators[size - 2].computed[perspective]
+-            && pos.count<ALL_PIECES>() >= MIN_PC_COUNT_HYBRID
+-            && ((int(dirtyPiece.from) & 0b100) == (int(dirtyPiece.to) & 0b100))
+-            && dirtyPiece.add_sq == SQ_NONE  // excludes castling
+-        )
+-        {
+-            update_accumulator_hybrid(perspective, pos, featureTransformer, mut_latest(),
+-                                      accumulators[size - 2], cache);
+-            return;
+-        }
+-
+         update_accumulator_refresh_cache(perspective, featureTransformer, pos, mut_latest(), cache);
+         backward_update_incremental(perspective, pos, featureTransformer, last_usable_accum);
+     }
+@@ -148,9 +121,7 @@ usize AccumulatorStack::find_last_usable_accumulator(Color perspective) const no
+         if (accumulators[curr_idx].computed[perspective])
+             return curr_idx;
+ 
+-        // Threat feature set refreshes require a king move across the center, i.e.,
+-        // a subset of halfka refreshes
+-        if (PSQFeatureSet::requires_refresh(accumulators[curr_idx].dirtyPiece, perspective))
++        if (FeatureSet::requires_refresh(accumulators[curr_idx].dirtyPiece, perspective))
+             return curr_idx;
+     }
+ 
+@@ -286,26 +257,6 @@ sf_always_inline PsqtTile apply(IndexType j, PsqtTile acc, const i32* data) {
+     return acc;
+ }
+ 
+-template<int sign>
+-sf_always_inline Tile apply_threat_features(IndexType                          j,
+-                                            Tile                               acc,
+-                                            const ThreatFeatureSet::IndexList& list,
+-                                            const FeatureTransformer&          ft) {
+-    static_assert(sign == 1 || sign == -1);
+-    usize vl = __riscv_vsetvl_e16m8(Dimensions - j);
+-    for (int i = 0; i < list.ssize(); ++i)
+-    {
+-        const i8* column =
+-          reinterpret_cast<const i8*>(&ft.threatAndPpWeights[list[i] * Dimensions + j]);
+-        vint8m4_t weight_vec = __riscv_vle8_v_i8m4(column, vl);
+-        if constexpr (sign == +1)
+-            acc = __riscv_vwadd_wv_i16m8(acc, weight_vec, vl);
+-        else
+-            acc = __riscv_vwsub_wv_i16m8(acc, weight_vec, vl);
+-    }
+-    return acc;
+-}
+-
+ #else  // VECTOR or non VECTOR
+ 
+     #ifdef VECTOR
+@@ -376,59 +327,6 @@ sf_always_inline void increment_index(IndexType& j) { j += Tiling::TileHeight; }
+ 
+ sf_always_inline void increment_psqt_index(IndexType& j) { j += Tiling::PsqtTileHeight; }
+ 
+-template<int sign>
+-sf_always_inline Tile apply_threat_features(IndexType                          j,
+-                                            Tile                               acc,
+-                                            const ThreatFeatureSet::IndexList& list,
+-                                            const FeatureTransformer&          ft) {
+-    static_assert(sign == 1 || sign == -1);
+-
+-    for (int i = 0; i < list.ssize(); ++i)
+-    {
+-        auto* column =
+-          reinterpret_cast<const vec_i8_t*>(&ft.threatAndPpWeights[list[i] * Dimensions + j]);
+-    #ifdef USE_NEON
+-        for (IndexType k = 0; k < Tiling::NumRegs; k += 2)
+-        {
+-            if constexpr (sign == +1)
+-            {
+-                acc[k]     = vaddw_s8(acc[k], vget_low_s8(column[k / 2]));
+-                acc[k + 1] = vaddw_high_s8(acc[k + 1], column[k / 2]);
+-            }
+-            else
+-            {
+-                acc[k]     = vsubw_s8(acc[k], vget_low_s8(column[k / 2]));
+-                acc[k + 1] = vsubw_high_s8(acc[k + 1], column[k / 2]);
+-            }
+-        }
+-    #elif defined(USE_LSX) && !defined(USE_LASX)
+-        for (IndexType k = 0; k < Tiling::NumRegs; k += 2)
+-        {
+-            if constexpr (sign == +1)
+-            {
+-                const __m128i weight = __lsx_vld(reinterpret_cast<const void*>(&column[k]), 0);
+-                acc[k]               = vec_add_16(acc[k], __lsx_vsllwil_h_b(weight, 0));
+-                acc[k + 1]           = vec_add_16(acc[k + 1], __lsx_vexth_h_b(weight));
+-            }
+-            else
+-            {
+-                const __m128i weight = __lsx_vld(reinterpret_cast<const void*>(&column[k]), 0);
+-                acc[k]               = vec_sub_16(acc[k], __lsx_vsllwil_h_b(weight, 0));
+-                acc[k + 1]           = vec_sub_16(acc[k + 1], __lsx_vexth_h_b(weight));
+-            }
+-        }
+-    #else
+-        for (IndexType k = 0; k < Tiling::NumRegs; ++k)
+-            if constexpr (sign == +1)
+-                acc[k] = vec_add_16(acc[k], vec_convert_8_16(column[k]));
+-            else
+-                acc[k] = vec_sub_16(acc[k], vec_convert_8_16(column[k]));
+-    #endif
+-    }
+-
+-    return acc;
+-}
+-
+ template<int sign>
+ sf_always_inline Tile apply(IndexType j, Tile acc, const i16* data) {
+     const auto* column = reinterpret_cast<const vec_t*>(data + j);
+@@ -454,10 +352,10 @@ sf_always_inline PsqtTile apply(IndexType j, PsqtTile acc, const i32* data) {
+ #endif
+ 
+ template<int sign, bool Incremental = false>
+-sf_always_inline Tile apply_psq_features(IndexType                       j,
+-                                         Tile                            acc,
+-                                         const PSQFeatureSet::IndexList& list,
+-                                         const FeatureTransformer&       ft) {
++sf_always_inline Tile apply_psq_features(IndexType                    j,
++                                         Tile                         acc,
++                                         const FeatureSet::IndexList& list,
++                                         const FeatureTransformer&    ft) {
+     static_assert(sign == 1 || sign == -1);
+     if constexpr (Incremental)
+     {
+@@ -483,14 +381,12 @@ sf_always_inline PsqtTile apply_psqt(IndexType                         j,
+     return acc;
+ }
+ 
+-void apply_combined(Color                              perspective,
+-                    const FeatureTransformer&          featureTransformer,
+-                    const AccumulatorState&            from,
+-                    AccumulatorState&                  to,
+-                    const PSQFeatureSet::IndexList&    psqAdded,
+-                    const PSQFeatureSet::IndexList&    psqRemoved,
+-                    const ThreatFeatureSet::IndexList& thrAdded,
+-                    const ThreatFeatureSet::IndexList& thrRemoved) {
++void apply_features(Color                        perspective,
++                    const FeatureTransformer&    featureTransformer,
++                    const AccumulatorState&      from,
++                    AccumulatorState&            to,
++                    const FeatureSet::IndexList& added,
++                    const FeatureSet::IndexList& removed) {
+ 
+     const auto& fromAcc = from.accumulation[perspective];
+     auto&       toAcc   = to.accumulation[perspective];
+@@ -505,11 +401,8 @@ void apply_combined(Color                              perspective,
+     {
+         acc = load_tile(j, fromAcc.data());
+ 
+-        acc = apply_psq_features<-1, true>(j, acc, psqRemoved, featureTransformer);
+-        acc = apply_psq_features<+1, true>(j, acc, psqAdded, featureTransformer);
+-
+-        acc = apply_threat_features<-1>(j, acc, thrRemoved, featureTransformer);
+-        acc = apply_threat_features<+1>(j, acc, thrAdded, featureTransformer);
++        acc = apply_psq_features<-1, true>(j, acc, removed, featureTransformer);
++        acc = apply_psq_features<+1, true>(j, acc, added, featureTransformer);
+ 
+         store_tile(j, toAcc.data(), acc);
+     }
+@@ -518,12 +411,8 @@ void apply_combined(Color                              perspective,
+     {
+         psqt = load_psqt(j, fromPsqtAcc.data());
+ 
+-        psqt = apply_psqt<-1>(j, psqt, psqRemoved, featureTransformer.psqtWeights.data());
+-        psqt = apply_psqt<+1>(j, psqt, psqAdded, featureTransformer.psqtWeights.data());
+-
+-        psqt =
+-          apply_psqt<-1>(j, psqt, thrRemoved, featureTransformer.threatAndPpPsqtWeights.data());
+-        psqt = apply_psqt<+1>(j, psqt, thrAdded, featureTransformer.threatAndPpPsqtWeights.data());
++        psqt = apply_psqt<-1>(j, psqt, removed, featureTransformer.psqtWeights.data());
++        psqt = apply_psqt<+1>(j, psqt, added, featureTransformer.psqtWeights.data());
+ 
+         store_psqt(j, toPsqtAcc.data(), psqt);
+     }
+@@ -543,36 +432,16 @@ void update_accumulator_incremental(Color                     perspective,
+     // That might depend on the feature set and generally relies on the
+     // feature set's update cost calculation to be correct and never allow
+     // updates with more added/removed features than MaxActiveDimensions.
+-    PSQFeatureSet::IndexList    psqRemoved, psqAdded;
+-    ThreatFeatureSet::IndexList thrRemoved, thrAdded;
++    FeatureSet::IndexList removed, added;
+ 
+-    const auto& dirtyPiece     = Forward ? target_state.dirtyPiece : computed.dirtyPiece;
+-    const auto& dirtyThreats   = Forward ? target_state.dirtyThreats : computed.dirtyThreats;
+-    const auto& dirtyPawnPairs = Forward ? target_state.dirtyPawnPairs : computed.dirtyPawnPairs;
+-
+-    // Used solely for prefetching
+-    const auto* threatPpBase = &featureTransformer.threatAndPpWeights[0];
+-    IndexType   pfStride     = FeatureTransformer::OutputDimensions;
++    const auto& dirtyPiece = Forward ? target_state.dirtyPiece : computed.dirtyPiece;
+ 
+     if constexpr (Forward)
+-    {
+-        ThreatFeatureSet::append_changed_indices(perspective, ksq, dirtyThreats, thrRemoved,
+-                                                 thrAdded, threatPpBase, pfStride);
+-        PairFeatureSet::append_changed_indices(perspective, ksq, dirtyPawnPairs, thrRemoved,
+-                                               thrAdded, threatPpBase, pfStride);
+-        PSQFeatureSet::append_changed_indices(perspective, ksq, dirtyPiece, psqRemoved, psqAdded);
+-    }
++        FeatureSet::append_changed_indices(perspective, ksq, dirtyPiece, removed, added);
+     else
+-    {
+-        ThreatFeatureSet::append_changed_indices(perspective, ksq, dirtyThreats, thrAdded,
+-                                                 thrRemoved, threatPpBase, pfStride);
+-        PairFeatureSet::append_changed_indices(perspective, ksq, dirtyPawnPairs, thrAdded,
+-                                               thrRemoved, threatPpBase, pfStride);
+-        PSQFeatureSet::append_changed_indices(perspective, ksq, dirtyPiece, psqAdded, psqRemoved);
+-    }
++        FeatureSet::append_changed_indices(perspective, ksq, dirtyPiece, added, removed);
+ 
+-    apply_combined(perspective, featureTransformer, computed, target_state, psqAdded, psqRemoved,
+-                   thrAdded, thrRemoved);
++    apply_features(perspective, featureTransformer, computed, target_state, added, removed);
+ 
+     target_state.computed[perspective] = true;
+ }
+@@ -588,27 +457,17 @@ void update_accumulator_incremental_both(const FeatureTransformer& featureTransf
+     assert(!target_state.computed[WHITE]);
+     assert(!target_state.computed[BLACK]);
+ 
+-    PSQFeatureSet::IndexList    psq_removed[COLOR_NB], psq_added[COLOR_NB];
+-    ThreatFeatureSet::IndexList thr_removed[COLOR_NB], thr_added[COLOR_NB];
++    FeatureSet::IndexList removed[COLOR_NB], added[COLOR_NB];
+ 
+-    const auto* threat_pp_base = &featureTransformer.threatAndPpWeights[0];
+-    const auto  pf_stride      = FeatureTransformer::OutputDimensions;
++    FeatureSet::append_changed_indices(WHITE, white_ksq, target_state.dirtyPiece, removed[WHITE],
++                                       added[WHITE]);
++    FeatureSet::append_changed_indices(BLACK, black_ksq, target_state.dirtyPiece, removed[BLACK],
++                                       added[BLACK]);
+ 
+-    ThreatFeatureSet::append_changed_indices_both(
+-      white_ksq, black_ksq, target_state.dirtyThreats, thr_removed[WHITE], thr_added[WHITE],
+-      thr_removed[BLACK], thr_added[BLACK], threat_pp_base, pf_stride);
+-    PairFeatureSet::append_changed_indices_both(
+-      white_ksq, black_ksq, target_state.dirtyPawnPairs, thr_removed[WHITE], thr_added[WHITE],
+-      thr_removed[BLACK], thr_added[BLACK], threat_pp_base, pf_stride);
+-    PSQFeatureSet::append_changed_indices(WHITE, white_ksq, target_state.dirtyPiece,
+-                                          psq_removed[WHITE], psq_added[WHITE]);
+-    PSQFeatureSet::append_changed_indices(BLACK, black_ksq, target_state.dirtyPiece,
+-                                          psq_removed[BLACK], psq_added[BLACK]);
+-
+-    apply_combined(WHITE, featureTransformer, computed, target_state, psq_added[WHITE],
+-                   psq_removed[WHITE], thr_added[WHITE], thr_removed[WHITE]);
+-    apply_combined(BLACK, featureTransformer, computed, target_state, psq_added[BLACK],
+-                   psq_removed[BLACK], thr_added[BLACK], thr_removed[BLACK]);
++    apply_features(WHITE, featureTransformer, computed, target_state, added[WHITE],
++                   removed[WHITE]);
++    apply_features(BLACK, featureTransformer, computed, target_state, added[BLACK],
++                   removed[BLACK]);
+ 
+     target_state.computed[WHITE] = true;
+     target_state.computed[BLACK] = true;
+@@ -717,203 +576,39 @@ Bitboard get_changed_pieces(const std::array<Piece, SQUARE_NB>& oldPieces,
+ #endif
+ }
+ 
+-// Updates accumulator for a king move, and also updates the accumulator cache
+-// for the new king position.
+-void update_accumulator_hybrid(Color                     perspective,
+-                               const Position&           pos,
+-                               const FeatureTransformer& featureTransformer,
+-                               AccumulatorState&         target,
+-                               const AccumulatorState&   computed,
+-                               AccumulatorCaches&        cache) {
+-    const auto& dirtyPiece = target.dirtyPiece;
+-
+-    assert(dirtyPiece.pc == make_piece(perspective, KING));
+-    assert(dirtyPiece.to != SQ_NONE);
+-    assert((int(dirtyPiece.from) & 0b100) == (int(dirtyPiece.to) & 0b100));
+-    assert(computed.computed[perspective]);
+-    assert(!target.computed[perspective]);
+-
+-    const Square oldKsq = dirtyPiece.from;
+-    const Square newKsq = dirtyPiece.to;
+-    assert(oldKsq != newKsq);
+-
+-    const auto& currentPieces  = pos.piece_array();
+-    auto        previousPieces = currentPieces;  // copies 64 bytes!
+-
+-    Bitboard previousPieceBB = pos.pieces();
+-
+-    assert(previousPieces[newKsq] == dirtyPiece.pc);
+-
+-    if (dirtyPiece.remove_sq != SQ_NONE)
+-    {
+-        assert(dirtyPiece.remove_sq == newKsq);
+-        previousPieces[newKsq] = dirtyPiece.remove_pc;
+-    }
+-    else
+-    {
+-        previousPieces[newKsq] = NO_PIECE;
+-        previousPieceBB &= ~square_bb(newKsq);
+-    }
+-
+-    assert(previousPieces[oldKsq] == NO_PIECE);
+-    previousPieces[oldKsq] = make_piece(perspective, KING);
+-    previousPieceBB |= square_bb(oldKsq);
+-
+-    const auto& oldEntry = cache[oldKsq][perspective];
+-    auto&       newEntry = cache[newKsq][perspective];
+-
+-    // "Remove" means we need to remove them from the cache entry,
+-    // "Add" means add them to the entry to get the accumulator we want
+-    PSQFeatureSet::IndexList oldRemove, oldAdd, newRemove, newAdd;
+-
+-    Bitboard oldChangedBB = get_changed_pieces(oldEntry.pieces, previousPieces);
+-    Bitboard oldRemovedBB = oldChangedBB & oldEntry.pieceBB;
+-    Bitboard oldAddedBB   = oldChangedBB & previousPieceBB;
+-
+-    Bitboard newChangedBB = get_changed_pieces(newEntry.pieces, currentPieces);
+-    Bitboard newRemovedBB = newChangedBB & newEntry.pieceBB;
+-    Bitboard newAddedBB   = newChangedBB & pos.pieces();
+-
+-#if defined(USE_AVX512ICL)
+-    PSQFeatureSet::write_indices(oldEntry.pieces, previousPieces, oldRemovedBB, oldAddedBB,
+-                                 perspective, oldKsq, oldRemove, oldAdd);
+-    PSQFeatureSet::write_indices(newEntry.pieces, currentPieces, newRemovedBB, newAddedBB,
+-                                 perspective, newKsq, newRemove, newAdd);
+-#else
+-    while (oldRemovedBB)
+-    {
+-        Square sq = pop_lsb(oldRemovedBB);
+-        oldRemove.push_back(
+-          PSQFeatureSet::make_index(perspective, sq, oldEntry.pieces[sq], oldKsq));
+-    }
+-    while (oldAddedBB)
+-    {
+-        Square sq = pop_lsb(oldAddedBB);
+-        oldAdd.push_back(PSQFeatureSet::make_index(perspective, sq, previousPieces[sq], oldKsq));
+-    }
+-    while (newRemovedBB)
+-    {
+-        Square sq = pop_lsb(newRemovedBB);
+-        newRemove.push_back(
+-          PSQFeatureSet::make_index(perspective, sq, newEntry.pieces[sq], newKsq));
+-    }
+-    while (newAddedBB)
+-    {
+-        Square sq = pop_lsb(newAddedBB);
+-        newAdd.push_back(PSQFeatureSet::make_index(perspective, sq, currentPieces[sq], newKsq));
+-    }
+-#endif
+-
+-    ThreatFeatureSet::IndexList thrRemoved, thrAdded;  // also contain pp indices
+-    const auto*                 threatPpBase = &featureTransformer.threatAndPpWeights[0];
+-    IndexType                   pfStride     = FeatureTransformer::OutputDimensions;
+-    ThreatFeatureSet::append_changed_indices(perspective, newKsq, target.dirtyThreats, thrRemoved,
+-                                             thrAdded, threatPpBase, pfStride);
+-    PairFeatureSet::append_changed_indices(perspective, newKsq, target.dirtyPawnPairs, thrRemoved,
+-                                           thrAdded, threatPpBase, pfStride);
+-
+-    const auto& fromAcc = computed.accumulation[perspective];
+-    auto&       toAcc   = target.accumulation[perspective];
+-
+-    const auto& fromPsqtAcc = computed.psqtAccumulation[perspective];
+-    auto&       toPsqtAcc   = target.psqtAccumulation[perspective];
+-
+-    Tile     acc;
+-    PsqtTile psqt;
+-
+-    for (IndexType j = 0; j < Dimensions; increment_index(j))
+-    {
+-        acc = load_tile(j, newEntry.accumulation.data());
+-
+-        acc = apply_psq_features<-1>(j, acc, newRemove, featureTransformer);
+-        acc = apply_psq_features<+1>(j, acc, newAdd, featureTransformer);
+-
+-        store_tile(j, newEntry.accumulation.data(), acc);
+-
+-        // adding the old accumulator adds (most of) the threats and pp weights that we need
+-        acc = apply<1>(j, acc, fromAcc.data());
+-        // But we have added a whole bunch of psq weights for the wrong king bucket which
+-        // we need to remove
+-        // first we remove the cached psq accumulation for the old king position...
+-        acc = apply<-1>(j, acc, oldEntry.accumulation.data());
+-
+-        // ... then we adjust
+-        acc = apply_psq_features<+1>(j, acc, oldRemove, featureTransformer);
+-        acc = apply_psq_features<-1>(j, acc, oldAdd, featureTransformer);
+-
+-        acc = apply_threat_features<-1>(j, acc, thrRemoved, featureTransformer);
+-        acc = apply_threat_features<+1>(j, acc, thrAdded, featureTransformer);
+-
+-        store_tile(j, toAcc.data(), acc);
+-    }
+-
+-    for (IndexType j = 0; j < PSQTBuckets; increment_psqt_index(j))
+-    {
+-        psqt = load_psqt(j, &newEntry.psqtAccumulation[0]);
+-
+-        psqt = apply_psqt<-1>(j, psqt, newRemove, featureTransformer.psqtWeights.data());
+-        psqt = apply_psqt<+1>(j, psqt, newAdd, featureTransformer.psqtWeights.data());
+-
+-        store_psqt(j, &newEntry.psqtAccumulation[0], psqt);
+-
+-        psqt = apply<+1>(j, psqt, &fromPsqtAcc[0]);
+-        psqt = apply<-1>(j, psqt, &oldEntry.psqtAccumulation[0]);
+-
+-        psqt = apply_psqt<+1>(j, psqt, oldRemove, featureTransformer.psqtWeights.data());
+-        psqt = apply_psqt<-1>(j, psqt, oldAdd, featureTransformer.psqtWeights.data());
+-
+-        psqt =
+-          apply_psqt<-1>(j, psqt, thrRemoved, featureTransformer.threatAndPpPsqtWeights.data());
+-        psqt = apply_psqt<+1>(j, psqt, thrAdded, featureTransformer.threatAndPpPsqtWeights.data());
+-
+-        store_psqt(j, toPsqtAcc.data(), psqt);
+-    }
+-
+-    newEntry.pieces  = currentPieces;
+-    newEntry.pieceBB = pos.pieces();
+-
+-    target.computed[perspective] = true;
+-}
+-
+-// HalfKA data comes from the Finny table entry, while the threats are built
+-// from the active threat features
+ void update_accumulator_refresh_cache(Color                     perspective,
+                                       const FeatureTransformer& featureTransformer,
+                                       const Position&           pos,
+                                       AccumulatorState&         accumulator,
+                                       AccumulatorCaches&        cache) {
+ 
+-    const Square             ksq   = pos.square<KING>(perspective);
+-    auto&                    entry = cache[ksq][perspective];
+-    PSQFeatureSet::IndexList removed, added;
++    const Square          ksq   = pos.square<KING>(perspective);
++    auto&                 entry = cache[FeatureSet::refresh_bucket(ksq)][perspective];
++    FeatureSet::IndexList removed, added;
+ 
+     const Bitboard changedBB = get_changed_pieces(entry.pieces, pos.piece_array());
+     Bitboard       removedBB = changedBB & entry.pieceBB;
+     Bitboard       addedBB   = changedBB & pos.pieces();
+ 
+ #if defined(USE_AVX512ICL)
+-    PSQFeatureSet::write_indices(entry.pieces, pos.piece_array(), removedBB, addedBB, perspective,
+-                                 ksq, removed, added);
++    FeatureSet::write_indices(entry.pieces, pos.piece_array(), removedBB, addedBB, perspective, ksq,
++                              removed, added);
+ #else
+     while (removedBB)
+     {
+         Square sq = pop_lsb(removedBB);
+-        removed.push_back(PSQFeatureSet::make_index(perspective, sq, entry.pieces[sq], ksq));
++        removed.push_back(FeatureSet::make_index(perspective, sq, entry.pieces[sq], ksq));
+     }
+     while (addedBB)
+     {
+         Square sq = pop_lsb(addedBB);
+-        added.push_back(PSQFeatureSet::make_index(perspective, sq, pos.piece_on(sq), ksq));
++        added.push_back(FeatureSet::make_index(perspective, sq, pos.piece_on(sq), ksq));
+     }
+ #endif
+ 
+     entry.pieceBB = pos.pieces();
+     entry.pieces  = pos.piece_array();
+ 
+-    ThreatFeatureSet::IndexList active;
+-    ThreatFeatureSet::append_active_indices(perspective, pos, active);
+-    PairFeatureSet::append_active_indices(perspective, pos, active);
+-
+     accumulator.computed[perspective] = true;
+ 
+     Tile     acc;
+@@ -927,9 +622,6 @@ void update_accumulator_refresh_cache(Color                     perspective,
+         acc = apply_psq_features<+1>(j, acc, added, featureTransformer);
+ 
+         store_tile(j, &entry.accumulation[0], acc);
+-
+-        acc = apply_threat_features<+1>(j, acc, active, featureTransformer);
+-
+         store_tile(j, accumulator.accumulation[perspective].data(), acc);
+     }
+ 
+@@ -941,9 +633,6 @@ void update_accumulator_refresh_cache(Color                     perspective,
+         psqt = apply_psqt<+1>(j, psqt, added, featureTransformer.psqtWeights.data());
+ 
+         store_psqt(j, entry.psqtAccumulation.data(), psqt);
+-
+-        psqt = apply_psqt<+1>(j, psqt, active, featureTransformer.threatAndPpPsqtWeights.data());
+-
+         store_psqt(j, accumulator.psqtAccumulation[perspective].data(), psqt);
+     }
+ }
+diff --git a/src/nnue/nnue_accumulator.h b/src/nnue/nnue_accumulator.h
+index e32decc1..32d09958 100644
+--- a/src/nnue/nnue_accumulator.h
++++ b/src/nnue/nnue_accumulator.h
+@@ -41,7 +41,7 @@ struct alignas(CacheLineSize) Accumulator;
+ class FeatureTransformer;
+ 
+ // Class that holds the result of affine transformation of input features,
+-// combined HalfKA + Threats
++// Input feature accumulator
+ struct alignas(CacheLineSize) Accumulator {
+     std::array<std::array<i16, L1>, COLOR_NB>          accumulation;
+     std::array<std::array<i32, PSQTBuckets>, COLOR_NB> psqtAccumulation;
+@@ -83,13 +83,15 @@ struct AccumulatorCaches {
+                 entry.clear(network.featureTransformer.biases);
+     }
+ 
+-    std::array<Entry, COLOR_NB>& operator[](Square sq) { return entries[sq]; }
++    std::array<Entry, COLOR_NB>& operator[](IndexType bucket) { return entries[bucket]; }
+ 
+-    std::array<std::array<Entry, COLOR_NB>, SQUARE_NB> entries;
++    std::array<std::array<Entry, COLOR_NB>, 2> entries;
+ };
+ 
+ 
+-struct AccumulatorState: public Accumulator, Dirties {};
++struct AccumulatorState: public Accumulator {
++    DirtyPiece dirtyPiece;
++};
+ 
+ class AccumulatorStack {
+    public:
+@@ -98,7 +100,7 @@ class AccumulatorStack {
+     [[nodiscard]] const AccumulatorState& latest() const noexcept;
+ 
+     void     reset() noexcept;
+-    Dirties& push() noexcept;
++    DirtyPiece& push() noexcept;
+     void     pop() noexcept;
+ 
+     void evaluate(const Position&           pos,
+diff --git a/src/nnue/nnue_architecture.h b/src/nnue/nnue_architecture.h
+index 8da61ed1..c6e59be5 100644
+--- a/src/nnue/nnue_architecture.h
++++ b/src/nnue/nnue_architecture.h
+@@ -24,9 +24,7 @@
+ #include <cstdint>
+ #include <iosfwd>
+ 
+-#include "features/half_ka_v2_hm.h"
+-#include "features/full_threats.h"
+-#include "features/pp_3wide.h"
++#include "features/p_hm.h"
+ #include "layers/affine_transform.h"
+ #include "layers/affine_transform_sparse_input.h"
+ #include "layers/clipped_relu.h"
+@@ -37,9 +35,7 @@
+ namespace Stockfish::Eval::NNUE {
+ 
+ // Input features used in evaluation function
+-using ThreatFeatureSet = Features::FullThreats;
+-using PairFeatureSet   = Features::PP_3Wide;
+-using PSQFeatureSet    = Features::HalfKAv2_hm;
++using FeatureSet = Features::P_hm;
+ 
+ // Number of input feature dimensions after conversion
+ constexpr IndexType L1 = 1024;
+diff --git a/src/nnue/nnue_common.h b/src/nnue/nnue_common.h
+index 6a1b68bd..1fc95d07 100644
+--- a/src/nnue/nnue_common.h
++++ b/src/nnue/nnue_common.h
+@@ -55,11 +55,10 @@
+ 
+ namespace Stockfish::Eval::NNUE {
+ 
+-using BiasType         = i16;
+-using ThreatWeightType = i8;
+-using WeightType       = i16;
+-using PSQTWeightType   = i32;
+-using IndexType        = u32;
++using BiasType       = i16;
++using WeightType     = i16;
++using PSQTWeightType = i32;
++using IndexType      = u32;
+ 
+ // Version of the evaluation file
+ constexpr u32 Version = 0x6A448AFAu;
+diff --git a/src/nnue/nnue_feature_transformer.h b/src/nnue/nnue_feature_transformer.h
+index 297000de..b7fcbcec 100644
+--- a/src/nnue/nnue_feature_transformer.h
++++ b/src/nnue/nnue_feature_transformer.h
+@@ -86,24 +86,12 @@ class FeatureTransformer {
+     using OutputType = TransformedFeatureType;
+ 
+     // Number of input/output dimensions
+-    static constexpr IndexType ThreatInputDimensions = ThreatFeatureSet::Dimensions;
+-    static constexpr IndexType PairInputDimensions   = PairFeatureSet::Dimensions;
+-    static constexpr IndexType PsqDimensions         = PSQFeatureSet::Dimensions;
+-    static constexpr IndexType ThreatAndPpDimensions = ThreatInputDimensions + PairInputDimensions;
+-    static constexpr IndexType InputDimensions       = PsqDimensions + ThreatAndPpDimensions;
+-    static constexpr IndexType OutputDimensions      = HalfDimensions;
+-    static constexpr IndexType ThreatWeightSize      = ThreatInputDimensions * HalfDimensions;
+-    static constexpr IndexType ThreatPsqtWeightSize  = ThreatInputDimensions * PSQTBuckets;
+-    static constexpr IndexType PairWeightSize        = PairInputDimensions * HalfDimensions;
+-    static constexpr IndexType PairPsqtWeightSize    = PairInputDimensions * PSQTBuckets;
+-    static constexpr IndexType ThreatAndPpWeightSize = ThreatAndPpDimensions * HalfDimensions;
+-    static constexpr IndexType ThreatAndPpPsqtSize   = ThreatAndPpDimensions * PSQTBuckets;
++    static constexpr IndexType InputDimensions  = FeatureSet::Dimensions;
++    static constexpr IndexType OutputDimensions = HalfDimensions;
+ 
+-    using BiasesArray            = std::array<BiasType, HalfDimensions>;
+-    using WeightArray            = std::array<WeightType, HalfDimensions * PsqDimensions>;
+-    using ThreatAndPpWeightArray = std::array<ThreatWeightType, ThreatAndPpWeightSize>;
+-    using PsqtWeightArray        = std::array<PSQTWeightType, PSQTBuckets * PsqDimensions>;
+-    using ThreatAndPpPsqtArray   = std::array<PSQTWeightType, ThreatAndPpPsqtSize>;
++    using BiasesArray     = std::array<BiasType, HalfDimensions>;
++    using WeightArray     = std::array<WeightType, HalfDimensions * InputDimensions>;
++    using PsqtWeightArray = std::array<PSQTWeightType, PSQTBuckets * InputDimensions>;
+ 
+     // Size of forward propagation buffer
+     static constexpr usize BufferSize = OutputDimensions * sizeof(OutputType);
+@@ -143,39 +131,25 @@ class FeatureTransformer {
+ 
+     // Hash value embedded in the evaluation file
+     static constexpr u32 get_hash_value() {
+-        return combine_hash(
+-                 {ThreatFeatureSet::HashValue, PairFeatureSet::HashValue, PSQFeatureSet::HashValue})
+-             ^ (OutputDimensions * 2);
++        return FeatureSet::HashValue ^ (OutputDimensions * 2);
+     }
+ 
+     void permute_weights() {
+         permute<16>(biases, PackusEpi16Order);
+         permute<16>(weights, PackusEpi16Order);
+ 
+-        permute<8>(threatAndPpWeights, PackusEpi16Order);
+     }
+ 
+     void unpermute_weights() {
+         permute<16>(biases, InversePackusEpi16Order);
+         permute<16>(weights, InversePackusEpi16Order);
+-        permute<8>(threatAndPpWeights, InversePackusEpi16Order);
+     }
+ 
+-    ThreatWeightType* threatWeightData() { return threatAndPpWeights.data(); }
+-    ThreatWeightType* pawnPairWeightData() { return threatWeightData() + ThreatWeightSize; }
+-    PSQTWeightType*   threatPsqtData() { return threatAndPpPsqtWeights.data(); }
+-    PSQTWeightType*   pawnPairPsqtData() { return threatPsqtData() + ThreatPsqtWeightSize; }
+-
+ 
+     // Read network parameters
+     bool read_parameters(std::istream& stream) {
+         read_leb_128(stream, biases);
+ 
+-        read_little_endian(stream, threatWeightData(), ThreatWeightSize);
+-        read_leb_128(stream, threatPsqtData(), ThreatPsqtWeightSize);
+-        read_little_endian(stream, pawnPairWeightData(), PairWeightSize);
+-        read_leb_128(stream, pawnPairPsqtData(), PairPsqtWeightSize);
+-
+         read_leb_128(stream, weights);
+         read_leb_128(stream, psqtWeights);
+ 
+@@ -192,12 +166,6 @@ class FeatureTransformer {
+ 
+         write_leb_128<BiasType>(stream, copy->biases);
+ 
+-
+-        write_little_endian(stream, copy->threatWeightData(), ThreatWeightSize);
+-        write_leb_128(stream, copy->threatPsqtData(), ThreatPsqtWeightSize);
+-        write_little_endian(stream, copy->pawnPairWeightData(), PairWeightSize);
+-        write_leb_128(stream, copy->pawnPairPsqtData(), PairPsqtWeightSize);
+-
+         write_leb_128<WeightType>(stream, copy->weights);
+         write_leb_128<PSQTWeightType>(stream, copy->psqtWeights);
+ 
+@@ -211,9 +179,6 @@ class FeatureTransformer {
+         hash_combine(h, get_raw_data_hash(weights));
+         hash_combine(h, get_raw_data_hash(psqtWeights));
+ 
+-        hash_combine(h, get_raw_data_hash(threatAndPpWeights));
+-        hash_combine(h, get_raw_data_hash(threatAndPpPsqtWeights));
+-
+         hash_combine(h, get_hash_value());
+ 
+         return h;
+@@ -432,14 +397,7 @@ class FeatureTransformer {
+    public:
+     alignas(CacheLineSize) BiasesArray biases;
+     alignas(CacheLineSize) WeightArray weights;
+-
+-    // Threats and pawn-pair features are concatenated into one array to allow for a single index to address either.
+-    // The first pawn-pair feature is at index ThreatFeatureSet::Dimensions.
+-    static_assert(PairFeatureSet::IndexBase == ThreatFeatureSet::Dimensions);
+-
+-    alignas(CacheLineSize) ThreatAndPpWeightArray threatAndPpWeights;
+     alignas(CacheLineSize) PsqtWeightArray psqtWeights;
+-    alignas(CacheLineSize) ThreatAndPpPsqtArray threatAndPpPsqtWeights;
+ };
+ 
+ }  // namespace Stockfish::Eval::NNUE
+diff --git a/src/position.cpp b/src/position.cpp
+index 3d0c5595..3078758a 100644
+--- a/src/position.cpp
++++ b/src/position.cpp
+@@ -817,7 +817,7 @@ bool Position::gives_check(Move m) const {
+ void Position::do_move(Move                      m,
+                        StateInfo&                newSt,
+                        bool                      givesCheck,
+-                       Dirties&                  dirties,
++                       DirtyPiece&               dp,
+                        const TranspositionTable* tt      = nullptr,
+                        const SharedHistories*    history = nullptr) {
+ 
+@@ -839,13 +839,6 @@ void Position::do_move(Move                      m,
+     ++st->rule50;
+     ++st->pliesFromNull;
+ 
+-    auto& dpps = dirties.dirtyPawnPairs;
+-    auto& dts  = dirties.dirtyThreats;
+-    auto& dp   = dirties.dirtyPiece;
+-
+-    dpps.before[WHITE] = pieces(WHITE, PAWN);
+-    dpps.before[BLACK] = pieces(BLACK, PAWN);
+-
+     Color  us       = sideToMove;
+     Color  them     = ~us;
+     Square from     = m.from_sq();
+@@ -868,7 +861,7 @@ void Position::do_move(Move                      m,
+         assert(captured == make_piece(us, ROOK));
+ 
+         Square rfrom, rto;
+-        do_castling<true>(us, from, to, rfrom, rto, &dts, &dp);
++        do_castling<true>(us, from, to, rfrom, rto, &dp);
+ 
+         k ^= Zobrist::psq[captured][rfrom] ^ Zobrist::psq[captured][rto];
+         st->nonPawnKey[us] ^= Zobrist::psq[captured][rfrom] ^ Zobrist::psq[captured][rto];
+@@ -893,7 +886,7 @@ void Position::do_move(Move                      m,
+                 assert(piece_on(capsq) == make_piece(them, PAWN));
+ 
+                 // Update board and piece lists in ep case, normal captures are updated later
+-                remove_piece(capsq, &dts);
++                remove_piece(capsq);
+             }
+ 
+             st->pawnKey ^= Zobrist::psq[captured][capsq];
+@@ -1027,15 +1020,15 @@ void Position::do_move(Move                      m,
+ 
+         if (captured && m.type_of() != EN_PASSANT)
+         {
+-            remove_piece(from, &dts);
+-            swap_piece(to, toPc, &dts);
++            remove_piece(from);
++            swap_piece(to, toPc);
+         }
+         else if (pc == toPc)
+-            move_piece(from, to, &dts);
++            move_piece(from, to);
+         else
+         {
+-            remove_piece(from, &dts);
+-            put_piece(toPc, to, &dts);
++            remove_piece(from);
++            put_piece(toPc, to);
+         }
+     }
+ 
+@@ -1071,9 +1064,6 @@ void Position::do_move(Move                      m,
+ 
+     assert(pos_is_ok());
+ 
+-    dpps.after[WHITE] = pieces(WHITE, PAWN);
+-    dpps.after[BLACK] = pieces(BLACK, PAWN);
+-
+     assert(dp.pc != NO_PIECE);
+     assert(!(bool(captured) || m.type_of() == CASTLING) ^ (dp.remove_sq != SQ_NONE));
+     assert(dp.from != SQ_NONE);
+@@ -1142,154 +1132,6 @@ void Position::undo_move(Move m) {
+     assert(pos_is_ok());
+ }
+ 
+-inline void add_dirty_threat(DirtyThreats* const dts,
+-                             bool                putPiece,
+-                             Piece               pc,
+-                             Piece               threatened,
+-                             Square              s,
+-                             Square              threatenedSq) {
+-    dts->list.push_back({pc, threatened, s, threatenedSq, putPiece});
+-}
+-
+-#ifdef USE_AVX512ICL
+-// Given a DirtyThreat template and bit offsets to insert the piece type and square, write the threats
+-// present at the given bitboard.
+-template<int SqShift, int PcShift>
+-void write_multiple_dirties(const Position& p,
+-                            Bitboard        mask,
+-                            DirtyThreat     dt_template,
+-                            DirtyThreats*   dts) {
+-    static_assert(sizeof(DirtyThreat) == 4);
+-
+-    const __m512i board    = _mm512_loadu_si512(p.piece_array().data());
+-    const int     dt_count = popcount(mask);
+-    assert(dt_count <= 16);
+-
+-    const __m512i template_v = _mm512_set1_epi32(dt_template.raw());
+-    auto*         write      = dts->list.make_space(dt_count);
+-
+-    // Extract the list of squares and upconvert to 32 bits. There are never more than 16
+-    // incoming threats so this is sufficient.
+-    __m512i threat_squares = _mm512_maskz_compress_epi8(mask, AllSquares);
+-    threat_squares         = _mm512_cvtepi8_epi32(_mm512_castsi512_si128(threat_squares));
+-
+-    __m512i threat_pieces =
+-      _mm512_maskz_permutexvar_epi8(0x1111111111111111ULL, threat_squares, board);
+-
+-    // Shift the piece and square into place
+-    threat_squares = _mm512_slli_epi32(threat_squares, SqShift);
+-    threat_pieces  = _mm512_slli_epi32(threat_pieces, PcShift);
+-
+-    const __m512i dirties =
+-      _mm512_ternarylogic_epi32(template_v, threat_squares, threat_pieces, 254 /* A | B | C */);
+-    _mm512_storeu_si512(write, dirties);
+-}
+-#endif
+-
+-constexpr bool can_slider_threat(Piece pc, Piece slider) {
+-    return type_of(pc) != QUEEN || type_of(slider) == QUEEN;
+-}
+-
+-template<bool ComputeRay>
+-void Position::update_piece_threats(Piece               pc,
+-                                    bool                putPiece,
+-                                    Square              s,
+-                                    DirtyThreats* const dts,
+-                                    // Silence spurious warning on GCC 10
+-                                    [[maybe_unused]] Bitboard noRaysContaining) const {
+-    const Bitboard occupied         = pieces();
+-    const auto [bAttacks, rAttacks] = both_attacks_bb(s, occupied);
+-    const Bitboard  sliderAttacks   = bAttacks | rAttacks;
+-    const Bitboard  occupiedNoK     = occupied ^ pieces(KING);
+-    const PieceType pt              = type_of(pc);
+-    const Bitboard  sliders = (pieces(BISHOP, QUEEN) & bAttacks) | (pieces(ROOK, QUEEN) & rAttacks);
+-
+-    auto process_sliders = [&](bool addDirectAttacks) {
+-        Bitboard b = sliders;
+-        while (b)
+-        {
+-            Square sliderSq = pop_lsb(b);
+-            Piece  slider   = piece_on(sliderSq);
+-
+-            const Bitboard ray        = ray_pass_bb(sliderSq, s);
+-            const Bitboard discovered = ray & sliderAttacks & occupiedNoK;
+-
+-            assert(!more_than_one(discovered));
+-            if (discovered && (ray & noRaysContaining) != noRaysContaining)
+-            {
+-                const Square threatenedSq = lsb(discovered);
+-                const Piece  threatenedPc = piece_on(threatenedSq);
+-                if (can_slider_threat(threatenedPc, slider))
+-                    add_dirty_threat(dts, !putPiece, slider, threatenedPc, sliderSq, threatenedSq);
+-            }
+-
+-            if (addDirectAttacks && can_slider_threat(pc, slider))
+-                add_dirty_threat(dts, putPiece, slider, pc, sliderSq, s);
+-        }
+-    };
+-
+-    // Kings emit no direct threats
+-    if (pt == KING)
+-    {
+-        if constexpr (ComputeRay)
+-            process_sliders(false);
+-        return;
+-    }
+-
+-    const Bitboard threatTargets = pt == PAWN                 ? pieces(KNIGHT, ROOK)
+-                                 : pt == BISHOP || pt == ROOK ? pieces(PAWN, KNIGHT, BISHOP, ROOK)
+-                                                              : occupiedNoK;
+-    Bitboard       threatened    = (pt == BISHOP  ? bAttacks
+-                                    : pt == ROOK  ? rAttacks
+-                                    : pt == QUEEN ? sliderAttacks
+-                                    : pt == PAWN  ? PseudoAttacks[color_of(pc)][s]
+-                                                  : PseudoAttacks[pt][s])
+-                        & threatTargets;
+-    Bitboard incomingThreats = PseudoAttacks[KNIGHT][s] & pieces(KNIGHT);
+-
+-    if (pt == KNIGHT || pt == ROOK)
+-        incomingThreats |= (attacks_bb<PAWN>(s, WHITE) & pieces(BLACK, PAWN))
+-                         | (attacks_bb<PAWN>(s, BLACK) & pieces(WHITE, PAWN));
+-
+-#ifdef USE_AVX512ICL
+-    write_multiple_dirties<DirtyThreat::ThreatenedSqOffset, DirtyThreat::ThreatenedPcOffset>(
+-      *this, threatened, {pc, NO_PIECE, s, Square(0), putPiece}, dts);
+-
+-    const Bitboard directSliders = pt == QUEEN ? sliders & pieces(QUEEN) : sliders;
+-    write_multiple_dirties<DirtyThreat::PcSqOffset, DirtyThreat::PcOffset>(
+-      *this, directSliders | incomingThreats, {NO_PIECE, pc, Square(0), s, putPiece}, dts);
+-
+-    // For ICL, direct threats were written above
+-    if constexpr (ComputeRay)
+-        process_sliders(false);
+-#else
+-    while (threatened)
+-    {
+-        Square threatenedSq = pop_lsb(threatened);
+-        Piece  threatenedPc = piece_on(threatenedSq);
+-        assert(threatenedSq != s);
+-        assert(threatenedPc != NO_PIECE);
+-
+-        add_dirty_threat(dts, putPiece, pc, threatenedPc, s, threatenedSq);
+-    }
+-
+-    if constexpr (ComputeRay)
+-        process_sliders(true);
+-    else
+-        incomingThreats |= pt == QUEEN ? sliders & pieces(QUEEN) : sliders;
+-
+-    while (incomingThreats)
+-    {
+-        Square srcSq = pop_lsb(incomingThreats);
+-        Piece  srcPc = piece_on(srcSq);
+-        assert(srcSq != s);
+-        assert(srcPc != NO_PIECE);
+-
+-        add_dirty_threat(dts, putPiece, srcPc, pc, srcSq, s);
+-    }
+-#endif
+-}
+-
+ Key Position::prefetch_key(Move m) const {
+     Square from     = m.from_sq();
+     Square to       = m.to_sq();
+@@ -1308,13 +1150,8 @@ Key Position::prefetch_key(Move m) const {
+ // Helper used to do/undo a castling move. This is a bit
+ // tricky in Chess960 where from/to squares can overlap.
+ template<bool Do>
+-void Position::do_castling(Color               us,
+-                           Square              from,
+-                           Square&             to,
+-                           Square&             rfrom,
+-                           Square&             rto,
+-                           DirtyThreats* const dts,
+-                           DirtyPiece* const   dp) {
++void Position::do_castling(
++  Color us, Square from, Square& to, Square& rfrom, Square& rto, DirtyPiece* const dp) {
+ 
+     bool kingSide = to > from;
+     rfrom         = to;  // Castling is encoded as "king captures friendly rook"
+@@ -1332,10 +1169,10 @@ void Position::do_castling(Color               us,
+     }
+ 
+     // Remove both pieces first since squares could overlap in Chess960
+-    remove_piece(Do ? from : to, dts);
+-    remove_piece(Do ? rfrom : rto, dts);
+-    put_piece(make_piece(us, KING), Do ? to : from, dts);
+-    put_piece(make_piece(us, ROOK), Do ? rto : rfrom, dts);
++    remove_piece(Do ? from : to);
++    remove_piece(Do ? rfrom : rto);
++    put_piece(make_piece(us, KING), Do ? to : from);
++    put_piece(make_piece(us, ROOK), Do ? rto : rfrom);
+ }
+ 
+ 
+diff --git a/src/position.h b/src/position.h
+index 04336b37..9717874e 100644
+--- a/src/position.h
++++ b/src/position.h
+@@ -147,7 +147,7 @@ class Position {
+     void do_move(Move                      m,
+                  StateInfo&                newSt,
+                  bool                      givesCheck,
+-                 Dirties&                  dirties,
++                 DirtyPiece&               dp,
+                  const TranspositionTable* tt,
+                  const SharedHistories*    worker);
+     void undo_move(Move m);
+@@ -185,9 +185,9 @@ class Position {
+ 
+     StateInfo* state() const;
+ 
+-    void put_piece(Piece pc, Square s, DirtyThreats* const dts = nullptr);
+-    void remove_piece(Square s, DirtyThreats* const dts = nullptr);
+-    void swap_piece(Square s, Piece pc, DirtyThreats* const dts = nullptr);
++    void put_piece(Piece pc, Square s);
++    void remove_piece(Square s);
++    void swap_piece(Square s, Piece pc);
+ 
+    private:
+     // Initialization helpers (used while setting up a position)
+@@ -197,21 +197,10 @@ class Position {
+     void set_check_info() const;
+ 
+     // Other helpers
+-    template<bool ComputeRay = true>
+-    void update_piece_threats(Piece               pc,
+-                              bool                putPiece,
+-                              Square              s,
+-                              DirtyThreats* const dts,
+-                              Bitboard            noRaysContaining = -1ULL) const;
+-    void move_piece(Square from, Square to, DirtyThreats* const dts = nullptr);
++    void move_piece(Square from, Square to);
+     template<bool Do>
+-    void do_castling(Color               us,
+-                     Square              from,
+-                     Square&             to,
+-                     Square&             rfrom,
+-                     Square&             rto,
+-                     DirtyThreats* const dts = nullptr,
+-                     DirtyPiece* const   dp  = nullptr);
++    void do_castling(
++      Color us, Square from, Square& to, Square& rfrom, Square& rto, DirtyPiece* const dp = nullptr);
+     template<bool AfterMove = false>
+     Key adjust_key50(Key k) const;
+ 
+@@ -228,7 +217,7 @@ class Position {
+     int        gamePly;
+     Color      sideToMove;
+     bool       chess960;
+-    Dirties    scratchDirties;
++    DirtyPiece scratchDirtyPiece;
+ };
+ 
+ std::ostream& operator<<(std::ostream& os, const Position& pos);
+@@ -378,23 +367,17 @@ inline bool Position::capture_stage(Move m) const {
+ 
+ inline Piece Position::captured_piece() const { return st->capturedPiece; }
+ 
+-inline void Position::put_piece(Piece pc, Square s, DirtyThreats* const dts) {
++inline void Position::put_piece(Piece pc, Square s) {
+     board[s] = pc;
+     byTypeBB[ALL_PIECES] |= byTypeBB[type_of(pc)] |= s;
+     byColorBB[color_of(pc)] |= s;
+     pieceCount[pc]++;
+     pieceCount[make_piece(color_of(pc), ALL_PIECES)]++;
+-
+-    if (dts)
+-        update_piece_threats(pc, true, s, dts);
+ }
+ 
+-inline void Position::remove_piece(Square s, DirtyThreats* const dts) {
++inline void Position::remove_piece(Square s) {
+     Piece pc = board[s];
+ 
+-    if (dts)
+-        update_piece_threats(pc, false, s, dts);
+-
+     byTypeBB[ALL_PIECES] ^= s;
+     byTypeBB[type_of(pc)] ^= s;
+     byColorBB[color_of(pc)] ^= s;
+@@ -403,41 +386,24 @@ inline void Position::remove_piece(Square s, DirtyThreats* const dts) {
+     pieceCount[make_piece(color_of(pc), ALL_PIECES)]--;
+ }
+ 
+-inline void Position::move_piece(Square from, Square to, DirtyThreats* const dts) {
++inline void Position::move_piece(Square from, Square to) {
+     Piece    pc     = board[from];
+     Bitboard fromTo = from | to;
+ 
+-    if (dts)
+-        update_piece_threats(pc, false, from, dts, fromTo);
+-
+     byTypeBB[ALL_PIECES] ^= fromTo;
+     byTypeBB[type_of(pc)] ^= fromTo;
+     byColorBB[color_of(pc)] ^= fromTo;
+     board[from] = NO_PIECE;
+     board[to]   = pc;
+-
+-    if (dts)
+-        update_piece_threats(pc, true, to, dts, fromTo);
+ }
+ 
+-inline void Position::swap_piece(Square s, Piece pc, DirtyThreats* const dts) {
+-    Piece old = board[s];
+-
++inline void Position::swap_piece(Square s, Piece pc) {
+     remove_piece(s);
+-
+-    if (dts)
+-        update_piece_threats<false>(old, false, s, dts);
+-
+     put_piece(pc, s);
+-
+-    if (dts)
+-        update_piece_threats<false>(pc, true, s, dts);
+ }
+ 
+ inline void Position::do_move(Move m, StateInfo& newSt, const TranspositionTable* tt = nullptr) {
+-    new (&scratchDirties.dirtyThreats) DirtyThreats;
+-    new (&scratchDirties.dirtyPawnPairs) DirtyPawnPairs;
+-    do_move(m, newSt, gives_check(m), scratchDirties, tt, nullptr);
++    do_move(m, newSt, gives_check(m), scratchDirtyPiece, tt, nullptr);
+ }
+ 
+ inline StateInfo* Position::state() const { return st; }
+diff --git a/src/search.cpp b/src/search.cpp
+index 7e8d745e..33d4cf7c 100644
+--- a/src/search.cpp
++++ b/src/search.cpp
+@@ -657,13 +657,12 @@ void Search::Worker::do_move(
+ 
+     ++nodes;
+ 
+-    Dirties& dirties = accumulatorStack.push();
+-    pos.do_move(move, st, givesCheck, dirties, &tt, &sharedHistory);
++    DirtyPiece& dirtyPiece = accumulatorStack.push();
++    pos.do_move(move, st, givesCheck, dirtyPiece, &tt, &sharedHistory);
+ 
+     if (ss != nullptr)
+     {
+-        auto& dirtyPiece = dirties.dirtyPiece;
+-        ss->currentMove  = move;
++        ss->currentMove = move;
+         ss->continuationHistory =
+           &continuationHistory[ss->inCheck][capture][dirtyPiece.pc][move.to_sq()];
+         ss->continuationCorrectionHistory =
+diff --git a/src/types.h b/src/types.h
+index f51bdb89..da03f2ec 100644
+--- a/src/types.h
++++ b/src/types.h
+@@ -305,56 +305,6 @@ struct DirtyPiece {
+     Piece  remove_pc, add_pc;
+ };
+ 
+-// Keep track of what threats change on the board (used by NNUE)
+-struct DirtyThreat {
+-    static constexpr int PcSqOffset         = 0;
+-    static constexpr int ThreatenedSqOffset = 8;
+-    static constexpr int ThreatenedPcOffset = 16;
+-    static constexpr int PcOffset           = 20;
+-
+-    DirtyThreat() { /* don't initialize data */ }
+-    DirtyThreat(u32 raw) :
+-        data(raw) {}
+-    DirtyThreat(Piece pc, Piece threatened_pc, Square pc_sq, Square threatened_sq, bool add) {
+-        data = (u32(add) << 31) | (pc << PcOffset) | (threatened_pc << ThreatenedPcOffset)
+-             | (threatened_sq << ThreatenedSqOffset) | (pc_sq << PcSqOffset);
+-    }
+-
+-    Piece  pc() const { return static_cast<Piece>(data >> PcOffset & 0xf); }
+-    Piece  threatened_pc() const { return static_cast<Piece>(data >> ThreatenedPcOffset & 0xf); }
+-    Square threatened_sq() const { return static_cast<Square>(data >> ThreatenedSqOffset & 0xff); }
+-    Square pc_sq() const { return static_cast<Square>(data >> PcSqOffset & 0xff); }
+-    bool   add() const { return data >> 31; }
+-    u32    raw() const { return data; }
+-
+-   private:
+-    u32 data;
+-};
+-
+-// A piece can be involved in at most 8 outgoing attacks and 16 incoming attacks.
+-// Moving a piece also can reveal at most 8 discovered attacks.
+-// This implies that a non-castling move can change at most (8 + 16) * 3 + 8 = 80 features.
+-// By similar logic, a castling move can change at most (5 + 1 + 3 + 9) * 2 = 36 features.
+-// Thus, 80 should work as an upper bound. Finally, 16 entries are added to accommodate
+-// unmasked vector stores near the end of the list.
+-
+-using DirtyThreatList = ValueList<DirtyThreat, 96>;
+-
+-struct DirtyThreats {
+-    DirtyThreatList list;
+-};
+-
+-struct DirtyPawnPairs {
+-    Bitboard before[COLOR_NB];
+-    Bitboard after[COLOR_NB];
+-};
+-
+-struct Dirties {
+-    DirtyPiece     dirtyPiece;
+-    DirtyThreats   dirtyThreats;
+-    DirtyPawnPairs dirtyPawnPairs;
+-};
+-
+     #define ENABLE_INCR_OPERATORS_ON(T) \
+         constexpr T& operator++(T& d) { return d = T(int(d) + 1); } \
+         constexpr T& operator--(T& d) { return d = T(int(d) - 1); }
+-- 
+2.55.0
+
