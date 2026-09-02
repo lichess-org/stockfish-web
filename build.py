@@ -123,7 +123,7 @@ CXX = em++
 EXE = {name}
 
 CXX_FLAGS = {all_cxx_flags} -Isrc -pthread -msimd128 -mavx -flto -fno-exceptions \\
-	-DUSE_POPCNT -DUSE_SSE2 -DUSE_SSSE3 -DUSE_SSE41 -DNO_PREFETCH \\
+    -DUSE_POPCNT -DUSE_SSE2 -DUSE_SSSE3 -DUSE_SSE41 -DUSE_SLOPPY_ATOMICS -DNO_PREFETCH \
 	-DNNUE_EMBEDDING_OFF -DNO_TABLEBASES \\
 	-DSTOCKFISH_WEB_{name.upper().replace("-", "_")}
 
