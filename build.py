@@ -136,6 +136,7 @@ LD_FLAGS = {ld_flags} \\
 
 SRCS = {' '.join(str(s) for s in sources)}
 OBJS = $(addprefix src/, $(SRCS:.cpp=.o)) src/glue.o
+DEPS = $(OBJS:.o=.d)
 
 $(EXE).js: $(OBJS)
 	$(CXX) $(CXX_FLAGS) $(LD_FLAGS) $(OBJS) -o $(EXE).js
@@ -143,10 +144,12 @@ $(EXE).js: $(OBJS)
 $(OBJS): Makefile.tmp
 
 %.o: %.cpp
-	$(CXX) $(CXX_FLAGS) -c $< -o $@
+	$(CXX) $(CXX_FLAGS) -MMD -MP -c $< -o $@
 
 src/glue.o: ../../src/glue.cpp
-	$(CXX) $(CXX_FLAGS) -c $< -o $@
+	$(CXX) $(CXX_FLAGS) -MMD -MP -c $< -o $@
+
+-include $(DEPS)
 
 """
     # fmt: on
@@ -441,6 +444,7 @@ def fetch_sources(name: TargetName) -> None:
 def clean() -> None:
     clean_list = [
         *fishes_dir.glob("**/*.o"),
+        *fishes_dir.glob("**/*.d"),
         *fishes_dir.glob("*/Makefile.tmp"),
         *fishes_dir.glob("*/pgo.profraw"),
         *fishes_dir.glob("*/pgo.profdata"),
