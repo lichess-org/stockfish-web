@@ -59,42 +59,26 @@ targets: dict[TargetName, Target] = {
         emcc=(5, 0, 7),
         tags=["all", "dist"],
     ),
-    "sf_18_smallnet": Target(
+    "sf_19_smallnet": Target(
         repo=stockfish_repo,
-        commit="cb3d4ee9b47d0c5aae855b12379378ea1439675c",
-        patches=["sf_18_smallnet.patch"],
-        emcc=(5, 0, 7),
-        tags=["all", "dist"],
-    ),
-    "sf_18": Target(
-        repo=stockfish_repo,
-        commit="cb3d4ee9b47d0c5aae855b12379378ea1439675c",
-        patches=["sf_18.patch"],
-        emcc=(5, 0, 7),
-        tags=["all", "dist"],
-    ),
-    "sf_dev_smallnet": Target(
-        repo=stockfish_repo,
-        commit="3f6f417b87c0e80ee30914b6b539b4ab7d3b2a5b",
+        commit="edb0d9db6731067ec50ce619ff372b463bc4dd5d",
         patches=[
-            "sf_dev_smallnet/0001-simple-mirrored-piece-square-features.patch",
-            "sf_dev_smallnet/0002-stockfish-web.patch",
+            "sf_19_smallnet/0001-simple-mirrored-piece-square-features.patch",
+            "sf_19_smallnet/0002-stockfish-web.patch",
         ],
         emcc=(5, 0, 7),
         tags=["all", "dist"],
     ),
-    "sf_dev": Target(
+    "sf_19": Target(
         repo=stockfish_repo,
-        commit="3f6f417b87c0e80ee30914b6b539b4ab7d3b2a5b",
-        patches=["sf_dev.patch"],
+        commit="edb0d9db6731067ec50ce619ff372b463bc4dd5d",
+        patches=["sf_19.patch"],
         emcc=(5, 0, 7),
         tags=["all", "dist"],
     ),
 }
-targets["sf_18_smallnet_relaxed-simd"] = targets["sf_18_smallnet"].relaxed_simd()
-targets["sf_18_relaxed-simd"] = targets["sf_18"].relaxed_simd()
-targets["sf_dev_smallnet_relaxed-simd"] = targets["sf_dev_smallnet"].relaxed_simd()
-targets["sf_dev_relaxed-simd"] = targets["sf_dev"].relaxed_simd()
+targets["sf_19_smallnet_relaxed-simd"] = targets["sf_19_smallnet"].relaxed_simd()
+targets["sf_19_relaxed-simd"] = targets["sf_19"].relaxed_simd()
 
 default_target = "all"
 

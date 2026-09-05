@@ -31,7 +31,7 @@ async function ensureNnue(filepath: string): Promise<Buffer> {
   return buf;
 }
 
-const createStockfish = (await import(`../${process.argv[2] ?? 'sf_18.js'}`)) as {
+const createStockfish = (await import(`../${process.argv[2] ?? 'sf_19.js'}`)) as {
   default: (init?: { onExit?: (code: number) => void }) => Promise<StockfishWeb>;
 };
 

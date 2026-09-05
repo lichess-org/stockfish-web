@@ -1,4 +1,4 @@
-From b78677a5b99cbc16f14d2ff2f9b3e7858698035c Mon Sep 17 00:00:00 2001
+From 99ee6a629239f2b5991d89c5f92a2ae03f5f3e19 Mon Sep 17 00:00:00 2001
 From: Niklas Fiekas <niklas.fiekas@backscattering.de>
 Date: Tue, 9 Jun 2026 22:13:56 +0200
 Subject: [PATCH] stockfish-web patch
@@ -67,26 +67,26 @@ index 304b2be0..9c65f29b 100644
      return 0;
  }
 diff --git a/src/misc.cpp b/src/misc.cpp
-index d6665cbe..fb8e1501 100644
+index b05e8e8c..77f311ae 100644
 --- a/src/misc.cpp
 +++ b/src/misc.cpp
-@@ -587,6 +587,7 @@ bool is_whitespace(std::string_view s) {
- }
- 
+@@ -602,6 +602,7 @@ bool is_whitespace(std::string_view s) {
+ // because when the NNUE network is not embeded in the binary, this directory
+ // is one of the locations where we look for the NNUE file.
  fs::path CommandLine::get_binary_directory(fs::path argv0) {
 +    return {};
  
  #ifdef _WIN32
      // Prefer the executable path reported by Windows. Unlike _get_wpgmptr,
-@@ -606,7 +607,7 @@ fs::path CommandLine::get_binary_directory(fs::path argv0) {
-     return binaryDirectory;
+@@ -622,7 +623,7 @@ fs::path CommandLine::get_binary_directory(fs::path argv0) {
  }
  
+ // Return the working directory
 -fs::path CommandLine::get_working_directory() { return std::filesystem::current_path(); }
 +fs::path CommandLine::get_working_directory() { return {}; }
  
- void set_console_utf8() {
- #ifdef _WIN32
+ 
+ // On Windows, tell the console to use UTF8 encoding
 diff --git a/src/nnue/network.cpp b/src/nnue/network.cpp
 index e6f166d4..cae4c041 100644
 --- a/src/nnue/network.cpp

@@ -30,9 +30,9 @@ Check `./build.py --help` for all available targets.
 Edit the Stockfish sources within `./fishes`. Contribute your edits via patch file:
 
 ```
-# Example: Update `sf_18.patch` with your commits
-cd fishes/sf_18
-git format-patch stockfish-web/base --stdout > ../../patches/sf_18.patch
+# Example: Update `sf_19.patch` with your commits
+cd fishes/sf_19
+git format-patch stockfish-web/base --stdout > ../../patches/sf_19.patch
 ```
 
 ## Run locally on node
@@ -42,39 +42,24 @@ nnue files into the current working directory.
 
 ```
 ./build.py
-node ./tools/wasm-cli.ts ./sf_18.js
+node ./tools/wasm-cli.ts ./sf_19.js
 uci
 ```
 
 ## Sources
 
-### sf_18_smallnet (Stockfish 18 with sscg13/threat-small)
+### sf_19_smallnet (Stockfish 19 with sscg13/size-optimize-nnue)
 
 - repo: https://github.com/official-stockfish/Stockfish
-- base: [cb3d4ee9](https://github.com/official-stockfish/Stockfish/commit/cb3d4ee9b47d0c5aae855b12379378ea1439675c)
-- tag: sf_18 (patch includes rebase of https://github.com/sscg13/Stockfish/tree/threat-small)
-- nnue: [nn-4ca89e4b3abf.nnue](https://tests.stockfishchess.org/api/nn/nn-4ca89e4b3abf.nnue)
-
-### sf_18 (Stockfish 18)
-
-- repo: https://github.com/official-stockfish/Stockfish
-- base: [cb3d4ee9](https://github.com/official-stockfish/Stockfish/commit/cb3d4ee9b47d0c5aae855b12379378ea1439675c)
-- tag: sf_18
-- big nnue: [nn-c288c895ea92.nnue](https://tests.stockfishchess.org/api/nn/nn-c288c895ea92.nnue)
-- small nnue: [nn-37f18f62d772.nnue](https://tests.stockfishchess.org/api/nn/nn-37f18f62d772.nnue)
-
-### sf_dev_smallnet (Stockfish dev-20260901-3f6f417b with sscg13/size-optimize-nnue)
-
-- repo: https://github.com/official-stockfish/Stockfish
-- base: [3f6f417b](https://github.com/official-stockfish/Stockfish/commit/3f6f417b87c0e80ee30914b6b539b4ab7d3b2a5b)
-- tag: stockfish-dev-20260901-3f6f417b (patches include rebase of sscg13/size-optimize-nnue)
+- base: [edb0d9db](https://github.com/official-stockfish/Stockfish/commit/edb0d9db6731067ec50ce619ff372b463bc4dd5d)
+- tag: sf_19 (patches include rebase of sscg13/size-optimize-nnue)
 - nnue: [nn-61e7af4bb97d.nnue](https://tests.stockfishchess.org/api/nn/nn-61e7af4bb97d.nnue)
 
-### sf_dev (Stockfish dev-20260901-3f6f417b)
+### sf_19 (Stockfish 19)
 
 - repo: https://github.com/official-stockfish/Stockfish
-- base: [3f6f417b](https://github.com/official-stockfish/Stockfish/commit/3f6f417b87c0e80ee30914b6b539b4ab7d3b2a5b)
-- tag: stockfish-dev-20260901-3f6f417b
+- base: [edb0d9db](https://github.com/official-stockfish/Stockfish/commit/edb0d9db6731067ec50ce619ff372b463bc4dd5d)
+- tag: sf_19
 - nnue: [nn-1a298aa575a0.nnue](https://tests.stockfishchess.org/api/nn/nn-1a298aa575a0.nnue)
 
 ### fsf_14 (Fairy-Stockfish 14)
