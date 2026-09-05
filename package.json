@@ -1,6 +1,6 @@
 {
   "name": "@lichess-org/stockfish-web",
-  "version": "0.4.4",
+  "version": "0.5.0",
   "//": "version is managed by the build system",
   "repository": {
     "type": "git",
