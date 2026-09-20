@@ -1,4 +1,4 @@
-From 99ee6a629239f2b5991d89c5f92a2ae03f5f3e19 Mon Sep 17 00:00:00 2001
+From 78650988a83dd20a09795769fd008aafb320da1c Mon Sep 17 00:00:00 2001
 From: Niklas Fiekas <niklas.fiekas@backscattering.de>
 Date: Tue, 9 Jun 2026 22:13:56 +0200
 Subject: [PATCH] stockfish-web patch
@@ -10,10 +10,11 @@ Co-authored-by: Jonathan Gamble <gamblej@gmail.com>
  src/misc.cpp         |  3 ++-
  src/nnue/network.cpp |  2 ++
  src/nnue/network.h   |  2 +-
+ src/thread_native.h  | 10 ++++++++++
  src/timeman.h        |  2 +-
  src/uci.cpp          |  7 +++----
  src/uci.h            |  3 ++-
- 8 files changed, 27 insertions(+), 12 deletions(-)
+ 9 files changed, 37 insertions(+), 12 deletions(-)
 
 diff --git a/src/engine.h b/src/engine.h
 index c4c05782..476eb1b2 100644
@@ -118,6 +119,28 @@ index 4bcae527..cdde7a7f 100644
  
      bool read_header(std::istream&, u32*, std::string*) const;
      bool write_header(std::ostream&, u32, const std::string&) const;
+diff --git a/src/thread_native.h b/src/thread_native.h
+index fce1c877..7fcb51da 100644
+--- a/src/thread_native.h
++++ b/src/thread_native.h
+@@ -85,7 +85,17 @@ class NativeThread {
+     pthread_t thread;
+     bool      running_ = false;
+ 
++#ifdef NDEBUG
++    // WebAssembly has no virtual memory: pthread_create() carves the whole
++    // stack out of the linear memory eagerly, and linear memory is never
++    // handed back, so an 8MB stack costs 8MB of resident memory per search
++    // thread. Search recursion is bounded by MAX_PLY and an optimized build
++    // emits at most a ~3.6KB frame for it, keeping the worst case below 1MB.
++    // A debug build emits ~6.2KB frames, so it keeps the larger stack.
++    static constexpr usize TH_STACK_SIZE = 2 * 1024 * 1024;
++#else
+     static constexpr usize TH_STACK_SIZE = 8 * 1024 * 1024;
++#endif
+ 
+     void start(NativeThreadOptions options, ThreadCallableBase* func) {
+         pthread_attr_t attr_storage, *attr = &attr_storage;
 diff --git a/src/timeman.h b/src/timeman.h
 index 437f6bbc..42320abc 100644
 --- a/src/timeman.h
