@@ -462,6 +462,19 @@ def which_runtime() -> str | None:
     return shutil.which("podman") or shutil.which("docker")
 
 
+@functools.cache
+def ensure_image(runtime: str, image: str) -> None:
+    exists = subprocess.run(
+        [runtime, "image", "inspect", image],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    if exists.returncode != 0:
+        # Pull now instead of multiple paralell pulls during build
+        subprocess.check_call([runtime, "pull", image])
+
+
 def get_command(name: TargetName, local_emsdk: bool, *args: str) -> list[str]:
     target = targets[name]
     local_emsdk_version = which_local_emsdk_version()
@@ -479,6 +492,8 @@ def get_command(name: TargetName, local_emsdk: bool, *args: str) -> list[str]:
     cache.mkdir(parents=True, exist_ok=True)
 
     image = f"docker.io/emscripten/emsdk:{join_version(target.emcc)}"
+    ensure_image(runtime, image)
+
     command = [runtime, "run", "--rm"]
     if Path(runtime).name == "docker":
         command += ["-u", f"{os.getuid()}:{os.getgid()}"]
