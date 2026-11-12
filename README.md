@@ -62,6 +62,13 @@ uci
 - tag: sf_19
 - nnue: [nn-1a298aa575a0.nnue](https://tests.stockfishchess.org/api/nn/nn-1a298aa575a0.nnue)
 
+### sf_dev (Stockfish dev-20261110-def601cc)
+
+- repo: https://github.com/official-stockfish/Stockfish
+- base: [def601cc](https://github.com/official-stockfish/Stockfish/commit/def601cc156f7d41f9ddea76d74515eddf232aaf)
+- tag: stockfish-dev-20261110-def601cc
+- nnue: [nn-68752b755c93.nnue](https://tests.stockfishchess.org/api/nn/nn-68752b755c93.nnue)
+
 ### fsf_14 (Fairy-Stockfish 14)
 
 - repo: https://github.com/fairy-stockfish/Fairy-Stockfish
