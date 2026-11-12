@@ -25,10 +25,10 @@ Tag = Literal["all", "legacy", "dist"]
 default_cxx_flags = [
     "-O3",
     "-DNDEBUG",
-    "--closure=1",
 ]
 
 default_ld_flags = [
+    "--closure=1",
     "-sENVIRONMENT=web,worker,node",
 ]
 
@@ -76,9 +76,17 @@ targets: dict[TargetName, Target] = {
         emcc=(5, 0, 7),
         tags=["all", "dist"],
     ),
+    "sf_dev": Target(
+        repo=stockfish_repo,
+        commit="def601cc156f7d41f9ddea76d74515eddf232aaf",
+        patches=["sf_dev.patch"],
+        emcc=(7, 0, 0),
+        tags=["all", "dist"],
+    ),
 }
 targets["sf_19_smallnet_relaxed-simd"] = targets["sf_19_smallnet"].relaxed_simd()
 targets["sf_19_relaxed-simd"] = targets["sf_19"].relaxed_simd()
+targets["sf_dev_relaxed-simd"] = targets["sf_dev"].relaxed_simd()
 
 default_target = "all"
 
@@ -259,8 +267,8 @@ def collect_pgo_profile(
     run_make(
         name,
         sources,
-        cxx_flags=f"{cxx_flags} -fprofile-instr-generate={profile_raw} --closure=0",
-        ld_flags=f"{ld_flags} -sNODERAWFS",
+        cxx_flags=f"{cxx_flags} -fprofile-instr-generate={profile_raw}",
+        ld_flags=f"{ld_flags} --closure=0 -sNODERAWFS",
         command=command,
     )
 

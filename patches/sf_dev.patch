@@ -1,0 +1,190 @@
+From 8295ecd4931c013882ade5033071a197297d44eb Mon Sep 17 00:00:00 2001
+From: Niklas Fiekas <niklas.fiekas@backscattering.de>
+Date: Tue, 9 Jun 2026 22:13:56 +0200
+Subject: [PATCH] stockfish-web patch
+
+Co-authored-by: Jonathan Gamble <gamblej@gmail.com>
+---
+ src/engine.h         |  7 +++++++
+ src/main.cpp         | 13 +++++++++----
+ src/misc.cpp         |  1 +
+ src/nnue/network.cpp |  2 ++
+ src/nnue/network.h   |  2 +-
+ src/thread_native.h  | 10 ++++++++++
+ src/timeman.h        |  2 +-
+ src/uci.cpp          |  7 +++----
+ src/uci.h            |  3 ++-
+ 9 files changed, 36 insertions(+), 11 deletions(-)
+
+diff --git a/src/engine.h b/src/engine.h
+index c4c05782..476eb1b2 100644
+--- a/src/engine.h
++++ b/src/engine.h
+@@ -99,6 +99,13 @@ class Engine {
+     void                                 load_network(const std::filesystem::path& file);
+     void save_network(const std::optional<std::filesystem::path>& file);
+ 
++    void load_big_network(std::istream& is) {
++        network.modify_and_replicate(
++          [this, &is](Eval::NNUE::Network& network_) { network_.load(is); });
++        threads.clear();
++        threads.ensure_network_replicated();
++    }
++
+     // utility functions
+ 
+     void trace_eval() const;
+diff --git a/src/main.cpp b/src/main.cpp
+index 304b2be0..9c65f29b 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -28,6 +28,8 @@
+ 
+ using namespace Stockfish;
+ 
++UCIEngine* uci_global;
++
+ #ifdef UNIVERSAL_BINARY
+ namespace Stockfish {
+ 
+@@ -42,12 +44,15 @@ int main(int argc, char* argv[]) {
+     Attacks::init();
+     Position::init();
+ 
+-    auto cli = CommandLine(argc, argv);
+-    auto uci = std::make_unique<UCIEngine>(std::move(cli));
++    auto cli = CommandLine(0, nullptr);
++    uci_global = new UCIEngine(std::move(cli));
+ 
+-    Tune::init(uci->engine_options());
++    Tune::init(uci_global->engine_options());
+ 
+-    uci->loop();
++    uci_global->loop();
++
++    delete uci_global;
++    uci_global = nullptr;
+ 
+     return 0;
+ }
+diff --git a/src/misc.cpp b/src/misc.cpp
+index 8639ba62..0ca42dce 100644
+--- a/src/misc.cpp
++++ b/src/misc.cpp
+@@ -606,6 +606,7 @@ bool is_whitespace(std::string_view s) {
+ // because when the NNUE network is not embedded in the binary, this directory
+ // is one of the locations where we look for the NNUE file.
+ fs::path CommandLine::get_binary_directory(fs::path argv0) {
++    return {};
+ 
+ #ifdef _WIN32
+     // Prefer the executable path reported by Windows. Unlike _get_wpgmptr,
+diff --git a/src/nnue/network.cpp b/src/nnue/network.cpp
+index 047aa238..21b551a8 100644
+--- a/src/nnue/network.cpp
++++ b/src/nnue/network.cpp
+@@ -179,6 +179,8 @@ Value Network::evaluate(const Position&    pos,
+ void Network::verify(const std::function<void(std::string_view)>& f,
+                      const EvalFile&                              evalFile,
+                      fs::path                                     evalfilePath) const {
++    return; // Yep
++
+     if (evalfilePath.empty())
+         evalfilePath = evalFile.defaultName;
+ 
+diff --git a/src/nnue/network.h b/src/nnue/network.h
+index 1ce18011..350016d3 100644
+--- a/src/nnue/network.h
++++ b/src/nnue/network.h
+@@ -78,12 +78,12 @@ class Network {
+ 
+     void load_external(const std::filesystem::path&, const std::filesystem::path&, EvalFile&);
+     void load_internal(EvalFile&);
++    std::optional<std::string> load(std::istream&);
+ 
+    private:
+     void initialize();
+ 
+     bool                       save(std::ostream&, const std::string&) const;
+-    std::optional<std::string> load(std::istream&);
+ 
+     bool read_header(std::istream&, u32*, std::string*) const;
+     bool write_header(std::ostream&, u32, const std::string&) const;
+diff --git a/src/thread_native.h b/src/thread_native.h
+index f280ca22..ff0d75ba 100644
+--- a/src/thread_native.h
++++ b/src/thread_native.h
+@@ -85,7 +85,17 @@ class NativeThread {
+     pthread_t thread;
+     bool      running_ = false;
+ 
++#ifdef NDEBUG
++    // WebAssembly has no virtual memory: pthread_create() carves the whole
++    // stack out of the linear memory eagerly, and linear memory is never
++    // handed back, so an 8MB stack costs 8MB of resident memory per search
++    // thread. Search recursion is bounded by MAX_PLY and an optimized build
++    // emits at most a ~3.6KB frame for it, keeping the worst case below 1MB.
++    // A debug build emits ~6.2KB frames, so it keeps the larger stack.
++    static constexpr usize TH_STACK_SIZE = 2 * 1024 * 1024;
++#else
+     static constexpr usize TH_STACK_SIZE = 8 * 1024 * 1024;
++#endif
+ 
+     void start(NativeThreadOptions options, ThreadCallableBase* func) {
+         pthread_attr_t attr_storage, *attr = &attr_storage;
+diff --git a/src/timeman.h b/src/timeman.h
+index 7af88aa2..d5b55821 100644
+--- a/src/timeman.h
++++ b/src/timeman.h
+@@ -49,7 +49,7 @@ class TimeManagement {
+     TimePoint elapsed(FUNC nodes) const {
+         return useNodesTime ? TimePoint(nodes()) : elapsed_time();
+     }
+-    TimePoint elapsed_time() const { return now() - startTime; }
++    TimePoint elapsed_time() const { return std::max(now() - startTime, TimePoint(1)); }
+ 
+     void clear();
+     void advance_nodes_time(i64 nodes);
+diff --git a/src/uci.cpp b/src/uci.cpp
+index 344cd09f..68d2a94c 100644
+--- a/src/uci.cpp
++++ b/src/uci.cpp
+@@ -43,6 +43,8 @@
+ #include "types.h"
+ #include "ucioption.h"
+ 
++std::string js_getline();  // src/glue.cpp
++
+ namespace Stockfish {
+ 
+ using Time = std::chrono::steady_clock;
+@@ -97,10 +99,7 @@ void UCIEngine::loop() {
+ 
+     do
+     {
+-        if (cli.argc == 1
+-            && !getline(std::cin, cmd))  // Wait for an input or an end-of-file (EOF) indication
+-            cmd = "quit";
+-
++        cmd = js_getline();
+         currentCmd = cmd;
+         std::istringstream is(cmd);
+ 
+diff --git a/src/uci.h b/src/uci.h
+index 4d3c4cbb..c6b77e32 100644
+--- a/src/uci.h
++++ b/src/uci.h
+@@ -55,8 +55,9 @@ class UCIEngine {
+ 
+     auto& engine_options() { return engine.get_options(); }
+ 
+-   private:
+     Engine      engine;
++
++   private:
+     CommandLine cli;
+     std::string currentCmd;
+ 
+-- 
+2.56.0
+
