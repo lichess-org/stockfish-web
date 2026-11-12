@@ -25,10 +25,10 @@ Tag = Literal["all", "legacy", "dist"]
 default_cxx_flags = [
     "-O3",
     "-DNDEBUG",
-    "--closure=1",
 ]
 
 default_ld_flags = [
+    "--closure=1",
     "-sENVIRONMENT=web,worker,node",
 ]
 
@@ -267,8 +267,8 @@ def collect_pgo_profile(
     run_make(
         name,
         sources,
-        cxx_flags=f"{cxx_flags} -fprofile-instr-generate={profile_raw} --closure=0",
-        ld_flags=f"{ld_flags} -sNODERAWFS",
+        cxx_flags=f"{cxx_flags} -fprofile-instr-generate={profile_raw}",
+        ld_flags=f"{ld_flags} --closure=0 -sNODERAWFS",
         command=command,
     )
 
