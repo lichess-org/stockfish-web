@@ -62,7 +62,7 @@ uci
 - tag: sf_19
 - nnue: [nn-1a298aa575a0.nnue](https://tests.stockfishchess.org/api/nn/nn-1a298aa575a0.nnue)
 
-### sf_dev (Stockfish dev-20261110-def601cc)
+### sf_dev (Stockfish dev-20261121-1c6f497a)
 
 - repo: https://github.com/official-stockfish/Stockfish
 - base: [1c6f497a](https://github.com/official-stockfish/Stockfish/commit/1c6f497afc176044b2feca9ce74a7bdce9e7e0cb)
