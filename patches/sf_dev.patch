@@ -1,4 +1,4 @@
-From 8295ecd4931c013882ade5033071a197297d44eb Mon Sep 17 00:00:00 2001
+From 0b9bcea9d603888dc75c2e05b8b98c33ee4bd7a2 Mon Sep 17 00:00:00 2001
 From: Niklas Fiekas <niklas.fiekas@backscattering.de>
 Date: Tue, 9 Jun 2026 22:13:56 +0200
 Subject: [PATCH] stockfish-web patch
@@ -17,7 +17,7 @@ Co-authored-by: Jonathan Gamble <gamblej@gmail.com>
  9 files changed, 36 insertions(+), 11 deletions(-)
 
 diff --git a/src/engine.h b/src/engine.h
-index c4c05782..476eb1b2 100644
+index f00e1d89..ffd729b0 100644
 --- a/src/engine.h
 +++ b/src/engine.h
 @@ -99,6 +99,13 @@ class Engine {
@@ -35,10 +35,10 @@ index c4c05782..476eb1b2 100644
  
      void trace_eval() const;
 diff --git a/src/main.cpp b/src/main.cpp
-index 304b2be0..9c65f29b 100644
+index 25a96617..526c6354 100644
 --- a/src/main.cpp
 +++ b/src/main.cpp
-@@ -28,6 +28,8 @@
+@@ -27,6 +27,8 @@
  
  using namespace Stockfish;
  
@@ -47,9 +47,9 @@ index 304b2be0..9c65f29b 100644
  #ifdef UNIVERSAL_BINARY
  namespace Stockfish {
  
-@@ -42,12 +44,15 @@ int main(int argc, char* argv[]) {
+@@ -40,12 +42,15 @@ int main(int argc, char* argv[]) {
+ 
      Attacks::init();
-     Position::init();
  
 -    auto cli = CommandLine(argc, argv);
 -    auto uci = std::make_unique<UCIEngine>(std::move(cli));
@@ -146,7 +146,7 @@ index 7af88aa2..d5b55821 100644
      void clear();
      void advance_nodes_time(i64 nodes);
 diff --git a/src/uci.cpp b/src/uci.cpp
-index 344cd09f..68d2a94c 100644
+index 66eaf31c..ad48f2be 100644
 --- a/src/uci.cpp
 +++ b/src/uci.cpp
 @@ -43,6 +43,8 @@
@@ -171,10 +171,10 @@ index 344cd09f..68d2a94c 100644
          std::istringstream is(cmd);
  
 diff --git a/src/uci.h b/src/uci.h
-index 4d3c4cbb..c6b77e32 100644
+index 7e291872..5de8dd62 100644
 --- a/src/uci.h
 +++ b/src/uci.h
-@@ -55,8 +55,9 @@ class UCIEngine {
+@@ -56,8 +56,9 @@ class UCIEngine {
  
      auto& engine_options() { return engine.get_options(); }
  

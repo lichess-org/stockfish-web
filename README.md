@@ -65,9 +65,9 @@ uci
 ### sf_dev (Stockfish dev-20261110-def601cc)
 
 - repo: https://github.com/official-stockfish/Stockfish
-- base: [def601cc](https://github.com/official-stockfish/Stockfish/commit/def601cc156f7d41f9ddea76d74515eddf232aaf)
-- tag: stockfish-dev-20261110-def601cc
-- nnue: [nn-68752b755c93.nnue](https://tests.stockfishchess.org/api/nn/nn-68752b755c93.nnue)
+- base: [1c6f497a](https://github.com/official-stockfish/Stockfish/commit/1c6f497afc176044b2feca9ce74a7bdce9e7e0cb)
+- tag: stockfish-dev-20261121-1c6f497a
+- nnue: [nn-bddd9d57eb87.nnue](https://tests.stockfishchess.org/api/nn/nn-bddd9d57eb87.nnue)
 
 ### fsf_14 (Fairy-Stockfish 14)
 

@@ -78,7 +78,7 @@ targets: dict[TargetName, Target] = {
     ),
     "sf_dev": Target(
         repo=stockfish_repo,
-        commit="def601cc156f7d41f9ddea76d74515eddf232aaf",
+        commit="1c6f497afc176044b2feca9ce74a7bdce9e7e0cb",
         patches=["sf_dev.patch"],
         emcc=(7, 0, 0),
         tags=["all", "dist"],
